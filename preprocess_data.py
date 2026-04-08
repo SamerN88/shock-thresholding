@@ -444,7 +444,7 @@ def train_valid_test_split(
     train_set = [ex for examples in split_info['complement_examples'].values() for ex in examples]
 
     # Check split proportions
-    vprint(f'VFDB Validation Set Proportion (desired class proportion = {vfdb_valid_p}):')
+    vprint(f'VFDB Validation Set Proportion (desired proportion = {vfdb_valid_p}):')
     vprint(f'  - shockable:      {100 * split_info['shockable_proportion'] :.2f}%')
     vprint(f'  - non-shockable:  {100 * split_info['nonshockable_proportion'] :.2f}%')
     vprint(f'  - overall:        {100 * split_info['overall_proportion'] :.2f}%')
