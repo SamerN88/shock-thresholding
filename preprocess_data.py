@@ -36,7 +36,7 @@ DB_DIRS = {
 }
 
 # Path for saving our data splits in a .npz file (using NumPy)
-SPLITS_PATH = os.path.abspath(os.path.join('data', 'splits.npz'))
+SPLITS_NPZ_PATH = os.path.abspath(os.path.join('data', 'splits.npz'))
 
 
 # HELPER FUNCTIONS FOR DATA RECORDS ------------------------------------------------------------------------------------
@@ -552,7 +552,7 @@ def main():
     )
 
     # Save the data splits to be loaded later
-    save_data_splits(splits_dict, path=SPLITS_PATH)
+    save_data_splits(splits_dict, path=SPLITS_NPZ_PATH)
 
 
 if __name__ == '__main__':
