@@ -26,8 +26,8 @@ VFDB = 'vfdb'
 CUDB = 'cudb'
 
 # Dataset paths
-VFDB_DIR = os.path.abspath(os.path.join('data', 'vfdb', 'physionet.org', 'files', 'vfdb', '1.0.0'))
-CUDB_DIR = os.path.abspath(os.path.join('data', 'cudb', 'physionet.org', 'files', 'cudb', '1.0.0'))
+VFDB_DIR = os.path.join('data', 'vfdb', 'physionet.org', 'files', 'vfdb', '1.0.0')
+CUDB_DIR = os.path.join('data', 'cudb', 'physionet.org', 'files', 'cudb', '1.0.0')
 
 # Get DB path by name
 DB_DIRS = {
@@ -36,7 +36,7 @@ DB_DIRS = {
 }
 
 # Path for saving our data splits in a .npz file (using NumPy)
-SPLITS_NPZ_PATH = os.path.abspath(os.path.join('data', 'splits.npz'))
+SPLITS_NPZ_PATH = os.path.join('data', 'splits.npz')
 
 
 # HELPER FUNCTIONS FOR DATA RECORDS ------------------------------------------------------------------------------------
