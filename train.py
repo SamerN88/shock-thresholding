@@ -24,15 +24,21 @@ from config import (
 )
 
 
-def train(resume=False, batch_size=BATCH_SIZE, lr=INIT_LEARNING_RATE, epochs=EPOCHS):
+def train(resume=False, batch_size=BATCH_SIZE, lr=INIT_LEARNING_RATE, epochs=EPOCHS, device=None):
     if epochs <= 0:
         raise ValueError('epochs must be positive')
 
     # Load training and validation data (not test)
     train_loader, valid_loader, _ = load_data_splits(batch_size=batch_size)
 
+    if device is None:
+        device = torch.device('cuda' if torch.cuda.is_available() else 'mps' if torch.backends.mps.is_available() else 'cpu')
+    else:
+        device = torch.device(device)
+    print(f'[Using device "{device}"]\n')
+
     # Instantiate model, loss function, optimizer, and LR scheduler
-    model = Ecg1LeadCNN()
+    model = Ecg1LeadCNN().to(device)
     loss_fxn = nn.BCEWithLogitsLoss()
     optimizer = optim.Adam(params=model.parameters(), lr=lr, weight_decay=1e-4)
     scheduler = optim.lr_scheduler.ReduceLROnPlateau(optimizer, mode='min', factor=LR_SCHEDULE_FACTOR, patience=LR_SCHEDULE_PATIENCE)
@@ -70,6 +76,7 @@ def train(resume=False, batch_size=BATCH_SIZE, lr=INIT_LEARNING_RATE, epochs=EPO
         # Training loop (run batches through model, compute loss, back-propagate)
         train_loss = 0
         for segs, labels in tqdm(train_loader, desc=f'Epoch {epoch}/{epochs} [train]', leave=False):
+            segs, labels = segs.to(device), labels.to(device)
             optimizer.zero_grad()
             logits = model(segs)
             loss = loss_fxn(logits.squeeze(-1), labels.float())  # squeeze: (B,1) -> (B,); .float(): DataLoader yields int64, loss expects float32
@@ -82,7 +89,13 @@ def train(resume=False, batch_size=BATCH_SIZE, lr=INIT_LEARNING_RATE, epochs=EPO
 
         # Validation loop (compute loss, accuracy, FPR, FNR on validation set)
         model.eval()
-        val_loss, acc, fpr, fnr = _validate(model, loss_fxn, valid_loader, desc=f'Epoch {epoch}/{epochs} [val]  ')
+        val_loss, acc, fpr, fnr = _validate(
+            model=model,
+            loss_fxn=loss_fxn,
+            data_loader=valid_loader,
+            device=device,
+            desc=f'Epoch {epoch}/{epochs} [val]  '
+        )
 
         # Compute and display runtime info, and step scheduler
         epoch_runtime = sw.elapsed()  # includes both train and validation time
@@ -117,7 +130,7 @@ def train(resume=False, batch_size=BATCH_SIZE, lr=INIT_LEARNING_RATE, epochs=EPO
 
     print()
     print('-'*50)
-    print('Done training. Final stats:')
+    print('Final stats:')
     print(f'    train_loss = {train_loss:.5f}')
     print(f'    valid_loss = {val_loss:.5f}')
     print(f'    acc        = {acc:.5f}')
@@ -129,21 +142,23 @@ def train(resume=False, batch_size=BATCH_SIZE, lr=INIT_LEARNING_RATE, epochs=EPO
     print()
 
 
-def _validate(model, loss_fxn, data_loader, desc=None):
+def _validate(model, loss_fxn, data_loader, device, desc=None):
     """One pass over data_loader; returns (val_loss, acc, FPR, FNR)."""
-    total_loss = 0
+    val_loss = 0
     tp = fp = tn = fn = 0
     with torch.no_grad():
+        # Validation loop
         for segs, labels in tqdm(data_loader, desc=desc, leave=False):
+            segs, labels = segs.to(device), labels.to(device)
             logits = model(segs)
-            total_loss += loss_fxn(logits.squeeze(-1), labels.float()).item()
+            val_loss += loss_fxn(logits.squeeze(-1), labels.float()).item()
             preds = (torch.sigmoid(logits.squeeze(-1)) >= 0.5).long().cpu().numpy()  # 0.5 is training-time diagnostic only; final eval uses θ*(λ)
-            labels = labels.numpy()
+            labels = labels.cpu().numpy()
             tp += ((preds == 1) & (labels == 1)).sum()
             fp += ((preds == 1) & (labels == 0)).sum()
             tn += ((preds == 0) & (labels == 0)).sum()
             fn += ((preds == 0) & (labels == 1)).sum()
-    val_loss = total_loss / len(data_loader)
+    val_loss = val_loss / len(data_loader)  # mean loss over batches
     acc = (tp + tn) / (tp + tn + fp + fn)
     fpr = fp / (fp + tn) if (fp + tn) > 0 else 0.0
     fnr = fn / (fn + tp) if (fn + tp) > 0 else 0.0
@@ -198,7 +213,7 @@ def _save_final_model(model, meta):
     pt_path = Path(FINAL_MODEL_PATH)
     torch.save(model.state_dict(), pt_path)  # weights only; optimizer/scheduler state not needed post-training
     pt_path.with_suffix('.json').write_text(json.dumps(meta, indent=4))
-    print(f'\nFinal model saved:  {pt_path}')
+    print(f'\nDone training. Final model saved:  {pt_path}')
 
 
 if __name__ == '__main__':
@@ -207,6 +222,7 @@ if __name__ == '__main__':
     parser.add_argument('--batch_size', type=int, default=BATCH_SIZE, help=f'Batch size (default: {BATCH_SIZE})')
     parser.add_argument('--lr', type=float, default=INIT_LEARNING_RATE, help=f'Initial learning rate (default: {INIT_LEARNING_RATE})')
     parser.add_argument('--epochs', type=int, default=EPOCHS, help=f'Number of training epochs (default: {EPOCHS})')
+    parser.add_argument('--device', type=str, default=None, help='Device to train on, e.g. "cuda", "mps", "cpu" (default: auto-detect)')
     args = parser.parse_args()
 
-    train(resume=args.resume, batch_size=args.batch_size, lr=args.lr, epochs=args.epochs)
+    train(resume=args.resume, batch_size=args.batch_size, lr=args.lr, epochs=args.epochs, device=args.device)
