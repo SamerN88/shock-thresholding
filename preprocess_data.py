@@ -510,7 +510,7 @@ class ECGDataset(Dataset):
         return self.X[idx], self.y[idx]
 
 
-def save_data_splits(splits_dict, path):
+def save_data_splits(splits_dict, *, path=SPLITS_NPZ_PATH):
     np.savez_compressed(
         path,
         train_X=np.array([seg for seg, _ in splits_dict['train']], dtype=np.float32),
@@ -522,7 +522,7 @@ def save_data_splits(splits_dict, path):
     )
 
 
-def load_data_splits(path, batch_size=BATCH_SIZE):
+def load_data_splits(*, path=SPLITS_NPZ_PATH, batch_size=BATCH_SIZE):
     data = np.load(path)
     # Use an explicit generator so DataLoader shuffle is reproducible regardless of
     # what other PyTorch ops have consumed from the global RNG state.
@@ -552,7 +552,7 @@ def main():
     )
 
     # Save the data splits to be loaded later
-    save_data_splits(splits_dict, path=SPLITS_NPZ_PATH)
+    save_data_splits(splits_dict)
 
 
 if __name__ == '__main__':

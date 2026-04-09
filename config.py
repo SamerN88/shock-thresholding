@@ -26,8 +26,8 @@ torch.backends.cudnn.benchmark = False
 
 VFDB_VALID_P = 0.2  # proportion of VFDB for validation split
 WINDOW_SEC = 2  # ECG segment length for each example, in sec
-MAX_NAN_GAP_SEC = 0.1*WINDOW_SEC  # for NaNs in ECG samples, linearly interpolate gaps up to 0.5s long; drop larger gaps
-NORMALIZE = True
+MAX_NAN_GAP_SEC = 0.1*WINDOW_SEC  # for NaNs in ECG samples, linearly interpolate gaps up to a limit; drop larger gaps
+NORMALIZE = True  # normalize ECG segments
 
 # TRAINING CONFIG ------------------------------------------------------------------------------------------------------
 
