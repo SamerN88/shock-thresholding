@@ -1,4 +1,6 @@
+import os
 import random
+
 import numpy as np
 import torch
 
@@ -32,8 +34,16 @@ NORMALIZE = True  # normalize ECG segments
 # TRAINING CONFIG ------------------------------------------------------------------------------------------------------
 
 BATCH_SIZE = 64
-LEARNING_RATE = ...
-EPOCHS = ...
+INIT_LEARNING_RATE = 0.01
+EPOCHS = 150
+LR_SCHEDULE_FACTOR = 0.5    # multiply LR by this on plateau
+LR_SCHEDULE_PATIENCE = 15   # number of epochs without val_loss improvement before reducing LR
+
+# MODEL PATHS ----------------------------------------------------------------------------------------------------------
+
+MODEL_DIR = 'model'
+CHECKPOINTS_DIR = os.path.join(MODEL_DIR, 'checkpoints')
+FINAL_MODEL_PATH = os.path.join(MODEL_DIR, 'final_model.pt')
 
 # OTHER ----------------------------------------------------------------------------------------------------------------
 

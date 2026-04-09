@@ -31,13 +31,13 @@ class SEBlock(nn.Module):
 
 
 # Component
-class PreActResUnit(nn.Module):
+class PreActResBranch(nn.Module):
     """
     "Pre-Activation Residual Unit"
     Follows He et al. (2016); see Figure 1.
     """
     def __init__(self, in_channels, out_channels, kernel_size, stride):
-        super(PreActResUnit, self).__init__()
+        super(PreActResBranch, self).__init__()
         self.conv = nn.Sequential(
             nn.BatchNorm1d(in_channels),  # (B, C_i, L)
             nn.ReLU(),  # (B, C_i, L)
@@ -62,7 +62,7 @@ class SEResNet(nn.Module):
 
         # Combined SE+Res arch:    input x0  ->  x1=Residual(x0)  ->  x2=SE(x1)  ->  x3=x1*x2  ->  output x3+x0
 
-        self.preActResUnit = PreActResUnit(in_channels, out_channels, kernel_size=kernel_size, stride=stride)  # (B, C_o, L/stride)
+        self.preActResUnit = PreActResBranch(in_channels, out_channels, kernel_size=kernel_size, stride=stride)  # (B, C_o, L/stride)
         self.seBlock = SEBlock(out_channels, reduction)  # (B, C_o, 1)
 
         # Skip connection; may have to reshape original input x0 via convolution if its shape doesn't match
