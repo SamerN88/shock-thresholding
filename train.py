@@ -90,7 +90,7 @@ def train(resume=False, batch_size=BATCH_SIZE, lr=INIT_LEARNING_RATE, epochs=EPO
         scheduler.step(val_loss)
         current_lr = optimizer.param_groups[0]['lr']
         ETA = avg_epoch_runtime * (epochs - epoch)
-        print(f'Epoch {(str(epoch) + ":").ljust(4)}    train_loss={train_loss:.5f}  val_loss={val_loss:.5f}  acc={acc:.4f}  FPR={fpr:.4f}  FNR={fnr:.4f}  lr={current_lr}  epoch_runtime={fmt_sec(epoch_runtime)}  ETA={fmt_sec(ETA)}')
+        print(f'Epoch {(str(epoch) + ":").ljust(4)}    train_loss={train_loss:.5f}  val_loss={val_loss:.5f}  acc={acc:.5f}  FPR={fpr:.5f}  FNR={fnr:.5f}  lr={current_lr}  epoch_runtime={fmt_sec(epoch_runtime)}  ETA={fmt_sec(ETA)}')
 
         # Info we save to a JSON for each epoch
         meta = {
@@ -190,7 +190,7 @@ def _load_latest_checkpoint(model, optimizer, scheduler):
     scheduler.load_state_dict(checkpoint['scheduler_state_dict'])
     start_epoch = checkpoint['epoch'] + 1
 
-    print(f'\nResuming from {latest}  (epoch {checkpoint["epoch"]} -> continuing from epoch {start_epoch})')
+    print(f'\nResuming from:  {latest}  (epoch {checkpoint["epoch"]} -> continuing from epoch {start_epoch})')
     return start_epoch
 
 
