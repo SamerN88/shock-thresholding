@@ -28,7 +28,7 @@ def train(resume=False, batch_size=BATCH_SIZE, lr=INIT_LEARNING_RATE, epochs=EPO
     if epochs <= 0:
         raise ValueError('epochs must be positive')
 
-    # Load training and validation data (not test)
+    # Load training and validation sets (not test)
     train_loader, valid_loader, _ = load_data_splits(batch_size=batch_size)
 
     if device is None:
