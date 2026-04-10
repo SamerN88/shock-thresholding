@@ -24,7 +24,6 @@ from config import (
 )
 
 
-# TODO: move all print statements to train()
 # TODO: make sure training is deterministic
 
 
