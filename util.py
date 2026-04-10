@@ -40,3 +40,7 @@ def fmt_sec(seconds: float) -> str:
     secs = int(seconds % 60)
 
     return f"{hours}h{minutes}m{secs}s"
+
+
+def flint(num):
+    return int(num) if float(num).is_integer() else float(num)

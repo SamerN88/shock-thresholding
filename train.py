@@ -11,7 +11,7 @@ from tqdm import tqdm
 
 from preprocess_data import load_data_splits
 from model import Ecg1LeadCNN
-from util import Stopwatch, fmt_sec
+from util import Stopwatch, fmt_sec, flint
 from config import (
     BATCH_SIZE,
     INIT_LEARNING_RATE,
@@ -24,42 +24,89 @@ from config import (
 )
 
 
-def train(resume=False, batch_size=BATCH_SIZE, lr=INIT_LEARNING_RATE, epochs=EPOCHS, device=None):
-    if epochs <= 0:
-        raise ValueError('epochs must be positive')
+# TODO: move all print statements to train()
+# TODO: make sure training is deterministic
 
-    # Load training and validation sets (not test)
-    train_loader, valid_loader, _ = load_data_splits(batch_size=batch_size)
 
+def train(cost_ratio=None, resume=False, batch_size=None, lr=None, epochs=None, device=None):
     if device is None:
         device = torch.device('cuda' if torch.cuda.is_available() else 'mps' if torch.backends.mps.is_available() else 'cpu')
     else:
         device = torch.device(device)
     print(f'[Using device "{device}"]\n')
 
+    explicit_lr = lr  # None if user didn't pass --lr explicitly; used for LR override on resume
+
+    # Reconcile training config: if resuming, load previous config as defaults; explicit CLI args override
+    # checkpoint values except cost_ratio, which must not change mid-training
+    if resume:
+        prev = _peek_checkpoint_config()
+
+        if cost_ratio is not None and float(cost_ratio) != float(prev['cost_ratio']):
+            print('\n' + '*'*64)
+            print('WARNING:')
+            print(f'    --cost_ratio={flint(cost_ratio)} conflicts with the original λ.')
+            print(f'    Changing λ mid-training invalidates the model.')
+            print(f'    Using original:  λ = {flint(prev["cost_ratio"])}')
+            print('*'*64 + '\n')
+        cost_ratio = prev['cost_ratio']
+        batch_size = batch_size if batch_size is not None else prev['batch_size']
+        lr = lr if lr is not None else prev['init_lr']
+        epochs = epochs if epochs is not None else prev['total_epochs']
+    else:
+        cost_ratio = float(cost_ratio) if cost_ratio is not None else 1.0
+        batch_size = batch_size if batch_size is not None else BATCH_SIZE
+        lr = lr if lr is not None else INIT_LEARNING_RATE
+        epochs = epochs if epochs is not None else EPOCHS
+
+    if epochs <= 0:
+        raise ValueError('epochs must be positive')
+
+    # Load training and validation sets (not test)
+    train_loader, valid_loader, _ = load_data_splits(batch_size=batch_size)
+
     # Instantiate model, loss function, optimizer, and LR scheduler
     model = Ecg1LeadCNN().to(device)
-    loss_fxn = nn.BCEWithLogitsLoss()
+    loss_fxn = nn.BCEWithLogitsLoss(pos_weight=torch.tensor(float(cost_ratio)).to(device))  # cost_ratio is the "λ" in our cost-sensitive framework
     optimizer = optim.Adam(params=model.parameters(), lr=lr, weight_decay=1e-4)
     scheduler = optim.lr_scheduler.ReduceLROnPlateau(optimizer, mode='min', factor=LR_SCHEDULE_FACTOR, patience=LR_SCHEDULE_PATIENCE)
 
     # Optionally resume training from a previously saved run
     if resume:
         start_epoch = _load_latest_checkpoint(model, optimizer, scheduler)
+        if start_epoch > epochs:
+            print('\nTraining already complete. Nothing to do.')
+            print(f'(Increase epochs above {start_epoch-1} to continue training.)')
+            return
+        if explicit_lr is not None:
+            # Override the checkpoint's LR and reset the scheduler so it treats the new LR as its
+            # starting point — without this, the old scheduler state could immediately reduce the
+            # new LR if it thinks training has been on a plateau
+            for param_group in optimizer.param_groups:
+                param_group['lr'] = explicit_lr
+            scheduler = optim.lr_scheduler.ReduceLROnPlateau(optimizer, mode='min', factor=LR_SCHEDULE_FACTOR, patience=LR_SCHEDULE_PATIENCE)
+            print(f'LR overridden to {explicit_lr}; LR scheduler reset.')
     else:
         if not _setup_fresh_run():
             return
         start_epoch = 1
 
+    # Display training config (hyperparams, etc.) before starting
+    lines = [
+        (f'    batch_size = {batch_size}', ''),
+        (f'    lr = {lr}', '(reduced on plateau)'),
+        (f'    epochs = {epochs}', f'(starting from epoch {start_epoch})'),
+        (f'    λ = {flint(cost_ratio)}', '(cost ratio C_FN / C_FP)')
+    ]
+    width = 4 + max(len(l[0]) for l in lines)
     print()
     print('-' * 50)
     print('Training config:')
-    print(f'    batch_size = {batch_size}')
-    print(f'    lr = {lr}  (reduced on plateau)')
-    print(f'    epochs = {epochs}  (starting from epoch {start_epoch})')
+    for hyperparam, note in lines:
+        print(hyperparam.ljust(width) + note)
     print('-'*50)
     print()
-    print(f'* Checkpoint saved every epoch to:  {CHECKPOINTS_DIR + os.path.sep}')
+    print(f'* Checkpoint saves every epoch to:  {CHECKPOINTS_DIR + os.path.sep}')
     print()
 
     sw = Stopwatch()
@@ -87,7 +134,7 @@ def train(resume=False, batch_size=BATCH_SIZE, lr=INIT_LEARNING_RATE, epochs=EPO
         # Mean loss over batches (same scale as val_loss)
         train_loss /= len(train_loader)
 
-        # Validation loop (compute loss, accuracy, FPR, FNR on validation set)
+        # Validation loop (compute loss, accuracy, FPR, FNR, and MC(λ) on validation set)
         model.eval()
         val_loss, acc, fpr, fnr = _validate(
             model=model,
@@ -96,6 +143,7 @@ def train(resume=False, batch_size=BATCH_SIZE, lr=INIT_LEARNING_RATE, epochs=EPO
             device=device,
             desc=f'Epoch {epoch}/{epochs} [val]  '
         )
+        MC_lam = fpr + cost_ratio*fnr  # misclassification cost ("clinical cost") w.r.t. cost ratio λ
 
         # Compute and display runtime info, and step scheduler
         epoch_runtime = sw.elapsed()  # includes both train and validation time
@@ -103,7 +151,7 @@ def train(resume=False, batch_size=BATCH_SIZE, lr=INIT_LEARNING_RATE, epochs=EPO
         scheduler.step(val_loss)
         current_lr = optimizer.param_groups[0]['lr']
         ETA = avg_epoch_runtime * (epochs - epoch)
-        print(f'Epoch {(str(epoch) + ":").ljust(4)}    train_loss={train_loss:.5f}  val_loss={val_loss:.5f}  acc={acc:.5f}  FPR={fpr:.5f}  FNR={fnr:.5f}  lr={current_lr}  epoch_runtime={fmt_sec(epoch_runtime)}  ETA={fmt_sec(ETA)}')
+        print(f'Epoch {f"{epoch}:".ljust(4)}    train_loss={train_loss:.5f}  val_loss={val_loss:.5f}  MC(λ)={MC_lam:.5f}  FPR={fpr:.5f}  FNR={fnr:.5f}  acc={acc:.5f}  lr={current_lr}  epoch_runtime={fmt_sec(epoch_runtime)}  ETA={fmt_sec(ETA)}')
 
         # Info we save to a JSON for each epoch
         meta = {
@@ -116,26 +164,28 @@ def train(resume=False, batch_size=BATCH_SIZE, lr=INIT_LEARNING_RATE, epochs=EPO
             'lr_schedule_patience': LR_SCHEDULE_PATIENCE,
             'train_loss': train_loss,
             'val_loss': val_loss,
-            'acc': acc,
+            'cost_ratio': cost_ratio,
+            'mc_lam': MC_lam,
             'fpr': fpr,
             'fnr': fnr,
+            'acc': acc
         }
 
-        # Skip checkpoint at final epoch; final model saved separately below
-        if epoch < epochs:
-            _save_checkpoint(epoch, model, optimizer, scheduler, meta)  # save the model at end of each epoch
+        # Save a checkpoint (model and training state) each epoch
+        _save_checkpoint(epoch, model, optimizer, scheduler, meta)
 
-    # Save the final model
+    # When training ends, save the final model and some info
     _save_final_model(model, meta)
 
     print()
     print('-'*50)
     print('Final stats:')
     print(f'    train_loss = {train_loss:.5f}')
-    print(f'    valid_loss = {val_loss:.5f}')
-    print(f'    acc        = {acc:.5f}')
+    print(f'    val_loss   = {val_loss:.5f}')
+    print(f'    MC(λ)      = {MC_lam:.5f}')
     print(f'    FPR        = {fpr:.5f}')
     print(f'    FNR        = {fnr:.5f}')
+    print(f'    acc        = {acc:.5f}')
     print()
     print(f'Total runtime: {fmt_sec(sw.total_elapsed())}')
     print('-' * 50)
@@ -192,6 +242,15 @@ def _save_checkpoint(epoch, model, optimizer, scheduler, meta):
     base.with_suffix('.json').write_text(json.dumps(meta, indent=4))
 
 
+def _peek_checkpoint_config():
+    """Read config from the latest checkpoint's JSON without loading model states."""
+    checkpoints = list(Path(CHECKPOINTS_DIR).glob('checkpoint-*.pt'))
+    if not checkpoints:
+        raise FileNotFoundError(f'resume=True but no checkpoint .pt files found in {CHECKPOINTS_DIR + os.path.sep}')
+    latest = max(checkpoints, key=lambda p: int(p.stem.split('-')[1]))
+    return json.loads(latest.with_suffix('.json').read_text())
+
+
 def _load_latest_checkpoint(model, optimizer, scheduler):
     checkpoints = list(Path(CHECKPOINTS_DIR).glob('checkpoint-*.pt'))
     if not checkpoints:
@@ -218,11 +277,15 @@ def _save_final_model(model, meta):
 
 if __name__ == '__main__':
     parser = argparse.ArgumentParser(description='Train ECG shock classification model')
-    parser.add_argument('--resume', action='store_true', default=False, help='Resume from latest checkpoint')
-    parser.add_argument('--batch_size', type=int, default=BATCH_SIZE, help=f'Batch size (default: {BATCH_SIZE})')
-    parser.add_argument('--lr', type=float, default=INIT_LEARNING_RATE, help=f'Initial learning rate (default: {INIT_LEARNING_RATE})')
-    parser.add_argument('--epochs', type=int, default=EPOCHS, help=f'Number of training epochs (default: {EPOCHS})')
-    parser.add_argument('--device', type=str, default=None, help='Device to train on, e.g. "cuda", "mps", "cpu" (default: auto-detect)')
+    parser.add_argument('--resume',     action='store_true',    default=False,  help='Resume from latest checkpoint (default: False)')
+    parser.add_argument('--batch_size', type=int,               default=None,   help=f'Batch size (default: {BATCH_SIZE}, or previous run value when resuming)')
+    parser.add_argument('--lr',         type=float,             default=None,   help=f'Initial learning rate (default: {INIT_LEARNING_RATE}, or previous run value when resuming)')
+    parser.add_argument('--epochs',     type=int,               default=None,   help=f'Total training epochs (default: {EPOCHS}, or previous run value when resuming)')
+    parser.add_argument('--device',     type=str,               default=None,   help='Device to train on, e.g. "cuda", "mps", "cpu" (default: auto-detect)')
+    parser.add_argument('--cost_ratio', type=float,             default=None,   help='Cost ratio λ = C_FN / C_FP (default: 1.0, or previous run value when resuming; cannot change mid-training)')
     args = parser.parse_args()
 
-    train(resume=args.resume, batch_size=args.batch_size, lr=args.lr, epochs=args.epochs, device=args.device)
+    try:
+        train(cost_ratio=args.cost_ratio, resume=args.resume, batch_size=args.batch_size, lr=args.lr, epochs=args.epochs, device=args.device)
+    except KeyboardInterrupt:
+        print('\n\nTraining interrupted. Resume with --resume flag.')
