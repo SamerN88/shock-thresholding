@@ -13,6 +13,7 @@ from preprocess_data import load_data_splits
 from model import Ecg1LeadCNN
 from util import Stopwatch, fmt_sec, flint
 from config import (
+    RANDOM_SEED,
     BATCH_SIZE,
     INIT_LEARNING_RATE,
     EPOCHS,
@@ -22,9 +23,6 @@ from config import (
     CHECKPOINTS_DIR,
     FINAL_MODEL_PATH
 )
-
-
-# TODO: make sure training is deterministic
 
 
 def train(cost_ratio=None, resume=False, batch_size=None, lr=None, epochs=None, device=None):
@@ -61,9 +59,6 @@ def train(cost_ratio=None, resume=False, batch_size=None, lr=None, epochs=None, 
     if epochs <= 0:
         raise ValueError('epochs must be positive')
 
-    # Load training and validation sets (not test)
-    train_loader, valid_loader, _ = load_data_splits(batch_size=batch_size)
-
     # Instantiate model, loss function, optimizer, and LR scheduler
     model = Ecg1LeadCNN().to(device)
     loss_fxn = nn.BCEWithLogitsLoss(pos_weight=torch.tensor(float(cost_ratio)).to(device))  # cost_ratio is the "λ" in our cost-sensitive framework
@@ -89,6 +84,12 @@ def train(cost_ratio=None, resume=False, batch_size=None, lr=None, epochs=None, 
         if not _setup_fresh_run():
             return
         start_epoch = 1
+
+    # Load training and validation sets (not test).
+    # The RNG is created here and re-seeded each epoch (RANDOM_SEED + epoch) so that each epoch's
+    # shuffle is deterministic and identical whether training is interrupted or not.
+    shuffle_rng = torch.Generator()
+    train_loader, valid_loader, _ = load_data_splits(batch_size=batch_size, rng=shuffle_rng)
 
     # Display training config (hyperparams, etc.) before starting
     lines = [
@@ -116,6 +117,11 @@ def train(cost_ratio=None, resume=False, batch_size=None, lr=None, epochs=None, 
     # off but "session epoch" resets to 1. We need the session epoch to accurately compute the ETA.
     avg_epoch_runtime = 0
     for session_epoch, epoch in enumerate(range(start_epoch, epochs+1), 1):
+        # Re-seed per epoch so each epoch's shuffle and any stochastic ops (e.g. dropout) are identical
+        # whether training is uninterrupted or resumed from a checkpoint.
+        shuffle_rng.manual_seed(RANDOM_SEED + epoch)
+        torch.manual_seed(RANDOM_SEED + epoch)
+
         sw.lap()
         model.train()
 
@@ -140,7 +146,7 @@ def train(cost_ratio=None, resume=False, batch_size=None, lr=None, epochs=None, 
             loss_fxn=loss_fxn,
             data_loader=valid_loader,
             device=device,
-            desc=f'Epoch {epoch}/{epochs} [val]  '
+            desc=f'Epoch {epoch}/{epochs} [valid]'
         )
         MC_lam = fpr + cost_ratio*fnr  # misclassification cost ("clinical cost") w.r.t. cost ratio λ
 

@@ -522,13 +522,11 @@ def save_data_splits(splits_dict, *, path=SPLITS_NPZ_PATH):
     )
 
 
-def load_data_splits(*, path=SPLITS_NPZ_PATH, batch_size=BATCH_SIZE):
+def load_data_splits(*, path=SPLITS_NPZ_PATH, batch_size=BATCH_SIZE, rng=None):
     data = np.load(path)
-    # Use an explicit generator so DataLoader shuffle is reproducible regardless of
-    # what other PyTorch ops have consumed from the global RNG state.
-    g = torch.Generator()
-    g.manual_seed(RANDOM_SEED)
-    train_loader = DataLoader(ECGDataset(data['train_X'], data['train_y']), batch_size=batch_size, shuffle=True, generator=g)
+    # Shuffle RNG is passed in as needed (intentional design choice; at the start of training we can re-seed
+    # the RNG each epoch so the shuffle is deterministic per epoch and thus interruption-safe).
+    train_loader = DataLoader(ECGDataset(data['train_X'], data['train_y']), batch_size=batch_size, shuffle=True, generator=rng)
     valid_loader = DataLoader(ECGDataset(data['valid_X'], data['valid_y']), batch_size=batch_size, shuffle=False)
     test_loader  = DataLoader(ECGDataset(data['test_X'],  data['test_y']),  batch_size=batch_size, shuffle=False)
     return train_loader, valid_loader, test_loader
