@@ -136,12 +136,12 @@ def train(cost_ratio=None, resume=False, batch_size=None, lr=None, epochs=None, 
             optimizer.step()
             train_loss += loss.item()
 
-        # Mean loss over batches (same scale as val_loss)
+        # Mean loss over batches (same scale as valid_loss)
         train_loss /= len(train_loader)
 
         # Validation loop (compute loss, accuracy, FPR, FNR, and MC(λ) on validation set)
         model.eval()
-        val_loss, acc, fpr, fnr = _validate(
+        valid_loss, acc, fpr, fnr = _validate(
             model=model,
             loss_fxn=loss_fxn,
             data_loader=valid_loader,
@@ -153,10 +153,10 @@ def train(cost_ratio=None, resume=False, batch_size=None, lr=None, epochs=None, 
         # Compute and display runtime info, and step scheduler
         epoch_runtime = sw.elapsed()  # includes both train and validation time
         avg_epoch_runtime += (epoch_runtime - avg_epoch_runtime) / session_epoch  # online mean
-        scheduler.step(val_loss)
+        scheduler.step(valid_loss)
         current_lr = optimizer.param_groups[0]['lr']
         ETA = avg_epoch_runtime * (epochs - epoch)
-        print(f'Epoch {f"{epoch}:".ljust(4)}    train_loss={train_loss:.5f}  val_loss={val_loss:.5f}  MC(λ)={MC_lam:.5f}  FPR={fpr:.5f}  FNR={fnr:.5f}  acc={acc:.5f}  lr={current_lr}  epoch_runtime={fmt_sec(epoch_runtime)}  ETA={fmt_sec(ETA)}')
+        print(f'Epoch {f"{epoch}:".ljust(4)}    train_loss={train_loss:.5f}  valid_loss={valid_loss:.5f}  MC(λ)={MC_lam:.5f}  FPR={fpr:.5f}  FNR={fnr:.5f}  acc={acc:.5f}  lr={current_lr}  epoch_runtime={fmt_sec(epoch_runtime)}  ETA={fmt_sec(ETA)}')
 
         # Info we save to a JSON for each epoch
         meta = {
@@ -168,7 +168,7 @@ def train(cost_ratio=None, resume=False, batch_size=None, lr=None, epochs=None, 
             'lr_schedule_factor': LR_SCHEDULE_FACTOR,
             'lr_schedule_patience': LR_SCHEDULE_PATIENCE,
             'train_loss': train_loss,
-            'val_loss': val_loss,
+            'valid_loss': valid_loss,
             'cost_ratio': cost_ratio,
             'mc_lam': MC_lam,
             'fpr': fpr,
@@ -186,7 +186,7 @@ def train(cost_ratio=None, resume=False, batch_size=None, lr=None, epochs=None, 
     print('-'*50)
     print('Final stats:')
     print(f'    train_loss = {train_loss:.5f}')
-    print(f'    val_loss   = {val_loss:.5f}')
+    print(f'    valid_loss   = {valid_loss:.5f}')
     print(f'    MC(λ)      = {MC_lam:.5f}')
     print(f'    FPR        = {fpr:.5f}')
     print(f'    FNR        = {fnr:.5f}')
@@ -198,26 +198,26 @@ def train(cost_ratio=None, resume=False, batch_size=None, lr=None, epochs=None, 
 
 
 def _validate(model, loss_fxn, data_loader, device, desc=None):
-    """One pass over data_loader; returns (val_loss, acc, FPR, FNR)."""
-    val_loss = 0
+    """One pass over data_loader; returns (valid_loss, acc, FPR, FNR)."""
+    valid_loss = 0
     tp = fp = tn = fn = 0
     with torch.no_grad():
         # Validation loop
         for segs, labels in tqdm(data_loader, desc=desc, leave=False):
             segs, labels = segs.to(device), labels.to(device)
             logits = model(segs)
-            val_loss += loss_fxn(logits.squeeze(-1), labels.float()).item()
+            valid_loss += loss_fxn(logits.squeeze(-1), labels.float()).item()
             preds = (torch.sigmoid(logits.squeeze(-1)) >= 0.5).long().cpu().numpy()  # 0.5 is training-time diagnostic only; final eval uses θ*(λ)
             labels = labels.cpu().numpy()
             tp += ((preds == 1) & (labels == 1)).sum()
             fp += ((preds == 1) & (labels == 0)).sum()
             tn += ((preds == 0) & (labels == 0)).sum()
             fn += ((preds == 0) & (labels == 1)).sum()
-    val_loss = val_loss / len(data_loader)  # mean loss over batches
+    valid_loss = valid_loss / len(data_loader)  # mean loss over batches
     acc = (tp + tn) / (tp + tn + fp + fn)
     fpr = fp / (fp + tn) if (fp + tn) > 0 else 0.0
     fnr = fn / (fn + tp) if (fn + tp) > 0 else 0.0
-    return val_loss, acc, fpr, fnr
+    return valid_loss, acc, fpr, fnr
 
 
 def _setup_fresh_run():
