@@ -29,7 +29,8 @@ torch.backends.cudnn.benchmark = False
 VFDB_VALID_P = 0.2  # proportion of VFDB for validation split
 WINDOW_SEC = 2  # ECG segment length for each example, in sec
 MAX_NAN_GAP_SEC = 0.1*WINDOW_SEC  # for NaNs in ECG samples, linearly interpolate gaps up to a limit; drop larger gaps
-NORMALIZE = True  # normalize ECG segments
+NORMALIZE = True  # normalize ECG segments (per-segment)
+SPLITS_NPZ_PATH = os.path.join('data', 'splits.npz')  # path for saving our data splits in a .npz file (using NumPy)
 
 # TRAINING CONFIG ------------------------------------------------------------------------------------------------------
 
@@ -37,13 +38,15 @@ BATCH_SIZE = 64
 INIT_LEARNING_RATE = 0.01
 EPOCHS = 150
 LR_SCHEDULE_FACTOR = 0.5    # multiply LR by this on plateau
-LR_SCHEDULE_PATIENCE = 15   # number of epochs without val_loss improvement before reducing LR
+LR_SCHEDULE_PATIENCE = 15   # number of epochs without valid_loss improvement before reducing LR
 
 # MODEL PATHS ----------------------------------------------------------------------------------------------------------
 
 MODEL_DIR = 'model'
 CHECKPOINTS_DIR = os.path.join(MODEL_DIR, 'checkpoints')
 FINAL_MODEL_PATH = os.path.join(MODEL_DIR, 'final_model.pt')
+CALIBRATED_DIR = 'calibrated'
+CALIBRATED_MODEL_PATH = os.path.join(CALIBRATED_DIR, 'calibrated.pt')
 
 # OTHER ----------------------------------------------------------------------------------------------------------------
 

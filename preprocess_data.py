@@ -1,4 +1,5 @@
 import os
+import random
 
 import wfdb
 import numpy as np
@@ -6,7 +7,6 @@ import torch
 from torch.utils.data import Dataset, DataLoader
 
 from config import (
-    RNG,
     RANDOM_SEED,
     SHOCKABLE,
     NON_SHOCKABLE,
@@ -14,7 +14,8 @@ from config import (
     WINDOW_SEC,
     BATCH_SIZE,
     MAX_NAN_GAP_SEC,
-    NORMALIZE
+    NORMALIZE,
+    SPLITS_NPZ_PATH
 )
 
 
@@ -34,9 +35,6 @@ DB_DIRS = {
     VFDB: VFDB_DIR,
     CUDB: CUDB_DIR
 }
-
-# Path for saving our data splits in a .npz file (using NumPy)
-SPLITS_NPZ_PATH = os.path.join('data', 'splits.npz')
 
 
 # HELPER FUNCTIONS FOR DATA RECORDS ------------------------------------------------------------------------------------
@@ -481,9 +479,11 @@ def train_valid_test_split(
     vprint(div)
 
     if shuffle:
-        RNG.shuffle(train_set)
-        RNG.shuffle(valid_set)
-        RNG.shuffle(test_set)
+        # Create RNG here to ensure we always get the same shuffle order
+        _shuffle_rng = random.Random(RANDOM_SEED)
+        _shuffle_rng.shuffle(train_set)
+        _shuffle_rng.shuffle(valid_set)
+        _shuffle_rng.shuffle(test_set)
 
     return {
         'train': train_set,
