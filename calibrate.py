@@ -24,6 +24,8 @@ def calibrate(device=None):
     model.load_state_dict(torch.load(FINAL_MODEL_PATH, map_location=device, weights_only=True))
     model.eval()
 
+    print(f'Calibrating model from:  {FINAL_MODEL_PATH}\n')
+
     # Load validation set only
     _, valid_loader, _ = load_data_splits()
 
