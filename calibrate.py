@@ -44,7 +44,7 @@ def calibrate(device=None):
     nll = nn.BCEWithLogitsLoss()
     nll_before = nll(all_logits, all_labels).item()
 
-    # Learn T by minimizing NLL on the validation logits (Guo et al. 2017).
+    # Learn T by minimizing NLL on the validation logits (Guo et al. 2017)
     # Logits and temperature stay on CPU since this is a small 1D convex optimization
     temperature = nn.Parameter(torch.ones(1))
     optimizer = optim.LBFGS([temperature], lr=0.1, max_iter=1000, line_search_fn='strong_wolfe')  # L-BFGS is an efficient convex optimizer
