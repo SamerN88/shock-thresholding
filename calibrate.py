@@ -79,7 +79,7 @@ def calibrate(device=None):
     meta['temperature'] = T
     pt_path.with_suffix('.json').write_text(json.dumps(meta, indent=4))
 
-    print(f'\nCalibrated model saved to:  {CALIBRATED_DIR + os.path.sep}')
+    print(f'\nCalibrated model saved to:  {CALIBRATED_MODEL_PATH}')
 
 
 if __name__ == '__main__':
