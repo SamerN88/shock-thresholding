@@ -186,7 +186,7 @@ def train(cost_ratio=None, resume=False, batch_size=None, lr=None, epochs=None, 
     print('-'*50)
     print('Final stats:')
     print(f'    train_loss = {train_loss:.5f}')
-    print(f'    valid_loss   = {valid_loss:.5f}')
+    print(f'    valid_loss = {valid_loss:.5f}')
     print(f'    MC(λ)      = {MC_lam:.5f}')
     print(f'    FPR        = {fpr:.5f}')
     print(f'    FNR        = {fnr:.5f}')
