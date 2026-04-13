@@ -10,11 +10,8 @@ import torch
 # Fixed random seed -- all RNGs rely on this
 RANDOM_SEED = 61
 
-# Python stdlib RNG
-RNG = random.Random(RANDOM_SEED)
-
-# NumPy RNG (modern explicit generator; use NP_RNG.integers(), NP_RNG.choice(), etc.)
-NP_RNG = np.random.default_rng(RANDOM_SEED)
+RNG = random.Random(RANDOM_SEED)  # Python stdlib RNG
+NP_RNG = np.random.default_rng(RANDOM_SEED)  # NumPy RNG
 
 # PyTorch CPU and GPU RNG
 torch.manual_seed(RANDOM_SEED)  # CPU
@@ -37,8 +34,8 @@ SPLITS_NPZ_PATH = os.path.join('data', 'splits.npz')  # path for saving our data
 BATCH_SIZE = 64
 INIT_LEARNING_RATE = 0.01
 EPOCHS = 150
-LR_SCHEDULE_FACTOR = 0.5    # multiply LR by this on plateau
-LR_SCHEDULE_PATIENCE = 15   # number of epochs without valid_loss improvement before reducing LR
+LR_SCHEDULE_FACTOR = 0.5  # multiply LR by this on plateau
+LR_SCHEDULE_PATIENCE = 15  # number of epochs without valid_loss improvement before reducing LR
 
 # MODEL PATHS ----------------------------------------------------------------------------------------------------------
 
