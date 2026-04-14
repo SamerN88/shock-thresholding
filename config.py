@@ -31,7 +31,7 @@ SPLITS_NPZ_PATH = os.path.join('data', 'splits.npz')  # path for saving our data
 
 BATCH_SIZE = 64
 INIT_LEARNING_RATE = 0.01
-EPOCHS = 150
+EPOCHS = 1
 LR_SCHEDULE_FACTOR = 0.5  # multiply LR by this on plateau
 LR_SCHEDULE_PATIENCE = 15  # number of epochs without valid_loss improvement before reducing LR
 
@@ -49,3 +49,4 @@ COST_SENSITIVE_DIR = 'cost_sensitive'
 # Labels
 SHOCKABLE = 1
 NON_SHOCKABLE = 0
+COST_RATIOS = [1.0, 2.0, 5.0, 10.0, 100.0]  # TODO: replace these dummy values with clinically-grounded cost ratios

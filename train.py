@@ -11,7 +11,7 @@ from tqdm import tqdm
 
 from preprocess_data import load_data_splits
 from model import Ecg1LeadCNN
-from util import Stopwatch, fmt_sec, flint
+from util import Stopwatch, fmt_sec
 from config import (
     RANDOM_SEED,
     RESET_RANDOM_STATE,
@@ -26,7 +26,7 @@ from config import (
 )
 
 
-def train(cost_ratio=None, resume=False, batch_size=None, lr=None, epochs=None, device=None):
+def train(pos_weight=None, resume=False, batch_size=None, lr=None, epochs=None, device=None):
     RESET_RANDOM_STATE()
 
     if device is None:
@@ -38,23 +38,25 @@ def train(cost_ratio=None, resume=False, batch_size=None, lr=None, epochs=None, 
     explicit_lr = lr  # None if user didn't pass --lr explicitly; used for LR override on resume
 
     # Reconcile training config: if resuming, load previous config as defaults; explicit CLI args override
-    # checkpoint values except cost_ratio, which must not change mid-training
+    # checkpoint values except pos_weight, which must not change mid-training
     if resume:
         prev = _peek_checkpoint_config()
 
-        if cost_ratio is not None and float(cost_ratio) != float(prev['cost_ratio']):
-            print('\n' + '*'*64)
+        if pos_weight is not None and float(pos_weight) != float(prev['pos_weight']):
+            print('*'*64)
             print('WARNING:')
-            print(f'    --cost_ratio={flint(cost_ratio)} conflicts with the original λ.')
-            print(f'    Changing λ mid-training invalidates the model.')
-            print(f'    Using original:  λ = {flint(prev["cost_ratio"])}')
-            print('*'*64 + '\n')
-        cost_ratio = prev['cost_ratio']
+            print(f'    --pos_weight={pos_weight} conflicts with the original pos_weight.')
+            print(f'    Changing pos_weight mid-training invalidates the model.')
+            print(f'    Using original:  pos_weight = {prev["pos_weight"]}')
+            print('*'*64)
+            print()
+
+        pos_weight = float(prev['pos_weight'])
         batch_size = batch_size if batch_size is not None else prev['batch_size']
         lr = lr if lr is not None else prev['init_lr']
         epochs = epochs if epochs is not None else prev['total_epochs']
     else:
-        cost_ratio = float(cost_ratio) if cost_ratio is not None else 1.0
+        pos_weight = float(pos_weight) if pos_weight is not None else 1.0
         batch_size = batch_size if batch_size is not None else BATCH_SIZE
         lr = lr if lr is not None else INIT_LEARNING_RATE
         epochs = epochs if epochs is not None else EPOCHS
@@ -64,7 +66,7 @@ def train(cost_ratio=None, resume=False, batch_size=None, lr=None, epochs=None, 
 
     # Instantiate model, loss function, optimizer, and LR scheduler
     model = Ecg1LeadCNN().to(device)
-    loss_fxn = nn.BCEWithLogitsLoss(pos_weight=torch.tensor(float(cost_ratio)).to(device))  # cost_ratio is the "λ" in our cost-sensitive framework
+    loss_fxn = nn.BCEWithLogitsLoss(pos_weight=torch.tensor(float(pos_weight)).to(device))
     optimizer = optim.Adam(params=model.parameters(), lr=lr, weight_decay=1e-4)
     scheduler = optim.lr_scheduler.ReduceLROnPlateau(optimizer, mode='min', factor=LR_SCHEDULE_FACTOR, patience=LR_SCHEDULE_PATIENCE)
 
@@ -72,7 +74,7 @@ def train(cost_ratio=None, resume=False, batch_size=None, lr=None, epochs=None, 
     if resume:
         start_epoch = _load_latest_checkpoint(model, optimizer, scheduler)
         if start_epoch > epochs:
-            print('\nTraining already complete. Nothing to do.')
+            print('Training already complete. Nothing to do.')
             print(f'(Increase epochs above {start_epoch-1} to continue training.)')
             return False
         if explicit_lr is not None:
@@ -99,15 +101,14 @@ def train(cost_ratio=None, resume=False, batch_size=None, lr=None, epochs=None, 
         (f'    batch_size = {batch_size}', ''),
         (f'    lr = {lr}', '(reduced on plateau)'),
         (f'    epochs = {epochs}', f'(starting from epoch {start_epoch})'),
-        (f'    λ = {flint(cost_ratio)}', '(cost ratio C_FN / C_FP)')
+        (f'    pos_weight = {pos_weight}', '')
     ]
     width = 4 + max(len(l[0]) for l in lines)
-    print()
-    print('-' * 50)
+    print('-'*70)
     print('Training config:')
     for hyperparam, note in lines:
         print(hyperparam.ljust(width) + note)
-    print('-'*50)
+    print('-'*70)
     print()
     print(f'* Checkpoint saves every epoch to:  {CHECKPOINTS_DIR + os.path.sep}')
     print()
@@ -142,7 +143,7 @@ def train(cost_ratio=None, resume=False, batch_size=None, lr=None, epochs=None, 
         # Mean loss over batches (same scale as valid_loss)
         train_loss /= len(train_loader)
 
-        # Validation loop (compute loss, accuracy, FPR, FNR, and MC(λ) on validation set)
+        # Validation loop (compute loss, accuracy, FPR, FNR on validation set)
         model.eval()
         valid_loss, acc, fpr, fnr = _validate(
             model=model,
@@ -151,7 +152,6 @@ def train(cost_ratio=None, resume=False, batch_size=None, lr=None, epochs=None, 
             device=device,
             desc=f'Epoch {epoch}/{epochs} [valid]'
         )
-        MC_lam = fpr + cost_ratio*fnr  # misclassification cost ("clinical cost") w.r.t. cost ratio λ
 
         # Compute and display runtime info, and step scheduler
         epoch_runtime = sw.elapsed()  # includes both train and validation time
@@ -159,7 +159,7 @@ def train(cost_ratio=None, resume=False, batch_size=None, lr=None, epochs=None, 
         scheduler.step(valid_loss)
         current_lr = optimizer.param_groups[0]['lr']
         ETA = avg_epoch_runtime * (epochs - epoch)
-        print(f'Epoch {f"{epoch}:".ljust(4)}    train_loss={train_loss:.5f}  valid_loss={valid_loss:.5f}  MC(λ)={MC_lam:.5f}  FPR={fpr:.5f}  FNR={fnr:.5f}  acc={acc:.5f}  lr={current_lr}  epoch_runtime={fmt_sec(epoch_runtime)}  ETA={fmt_sec(ETA)}')
+        print(f'Epoch {f"{epoch}:".ljust(4)}    train_loss={train_loss:.5f}  valid_loss={valid_loss:.5f}  FPR={fpr:.5f}  FNR={fnr:.5f}  acc={acc:.5f}  lr={current_lr}  epoch_runtime={fmt_sec(epoch_runtime)}  ETA={fmt_sec(ETA)}')
 
         # Info we save to a JSON for each epoch
         meta = {
@@ -172,8 +172,7 @@ def train(cost_ratio=None, resume=False, batch_size=None, lr=None, epochs=None, 
             'lr_schedule_patience': LR_SCHEDULE_PATIENCE,
             'train_loss': train_loss,
             'valid_loss': valid_loss,
-            'cost_ratio': cost_ratio,
-            'mc_lam': MC_lam,
+            'pos_weight': pos_weight,
             'fpr': fpr,
             'fnr': fnr,
             'acc': acc
@@ -186,18 +185,16 @@ def train(cost_ratio=None, resume=False, batch_size=None, lr=None, epochs=None, 
     _save_final_model(model, meta)
 
     print()
-    print('-'*50)
+    print('-'*70)
     print('Final stats:')
     print(f'    train_loss = {train_loss:.5f}')
     print(f'    valid_loss = {valid_loss:.5f}')
-    print(f'    MC(λ)      = {MC_lam:.5f}')
     print(f'    FPR        = {fpr:.5f}')
     print(f'    FNR        = {fnr:.5f}')
     print(f'    acc        = {acc:.5f}')
     print()
     print(f'Total runtime: {fmt_sec(sw.total_elapsed())}')
-    print('-' * 50)
-    print()
+    print('-'*70)
 
     return True
 
@@ -230,13 +227,14 @@ def _setup_fresh_run():
     model_dir = Path(MODEL_DIR)
     if model_dir.exists() and any(p.is_file() for p in model_dir.rglob('*')):
         try:
-            confirm = input(f'\nWARNING: {MODEL_DIR + os.path.sep} is non-empty. THIS WILL DELETE ALL EXISTING CHECKPOINTS AND MODELS.\nType "yes" to confirm: ')
+            confirm = input(f'WARNING: {MODEL_DIR + os.path.sep} is non-empty. THIS WILL DELETE ALL EXISTING CHECKPOINTS AND MODELS.\nType "yes" to confirm: ')
         except KeyboardInterrupt:
             print('\n\nAborted.')
             return False
         if confirm.strip().lower() != 'yes':
             print('\nAborted.')
             return False
+        print()
         shutil.rmtree(model_dir)
     Path(CHECKPOINTS_DIR).mkdir(parents=True, exist_ok=True)
     return True
@@ -275,7 +273,7 @@ def _load_latest_checkpoint(model, optimizer, scheduler):
     scheduler.load_state_dict(checkpoint['scheduler_state_dict'])
     start_epoch = checkpoint['epoch'] + 1
 
-    print(f'\nResuming from:  {latest}  (epoch {checkpoint["epoch"]} -> continuing from epoch {start_epoch})')
+    print(f'Resuming from:  {latest}  (epoch {checkpoint["epoch"]} -> continuing from epoch {start_epoch})\n')
     return start_epoch
 
 
@@ -283,7 +281,7 @@ def _save_final_model(model, meta):
     pt_path = Path(FINAL_MODEL_PATH)
     torch.save({
         'model_state_dict': model.state_dict(),
-        'cost_ratio': meta['cost_ratio'],
+        'pos_weight': meta['pos_weight'],
         'temperature': 1.0  # uncalibrated; may be updated by calibrate.py
     }, pt_path)
     pt_path.with_suffix('.json').write_text(json.dumps(meta, indent=4))
@@ -297,10 +295,10 @@ if __name__ == '__main__':
     parser.add_argument('--lr',         type=float,             default=None,   help=f'Initial learning rate (default: {INIT_LEARNING_RATE}, or previous run value when resuming)')
     parser.add_argument('--epochs',     type=int,               default=None,   help=f'Total training epochs (default: {EPOCHS}, or previous run value when resuming)')
     parser.add_argument('--device',     type=str,               default=None,   help='Device to train on, e.g. "cuda", "mps", "cpu" (default: auto-detect)')
-    parser.add_argument('--cost_ratio', type=float,             default=None,   help='Cost ratio λ = C_FN / C_FP (default: 1.0, or previous run value when resuming; cannot change mid-training)')
+    parser.add_argument('--pos_weight', type=float,             default=None,   help='pos_weight for BCEWithLogitsLoss (default: 1.0, or previous run value when resuming; cannot change mid-training)')
     args = parser.parse_args()
 
     try:
-        train(cost_ratio=args.cost_ratio, resume=args.resume, batch_size=args.batch_size, lr=args.lr, epochs=args.epochs, device=args.device)
+        train(pos_weight=args.pos_weight, resume=args.resume, batch_size=args.batch_size, lr=args.lr, epochs=args.epochs, device=args.device)
     except KeyboardInterrupt:
-        print('\n\nTraining interrupted. Resume with --resume flag.')
+        print('\nTraining interrupted. Resume with --resume flag.')

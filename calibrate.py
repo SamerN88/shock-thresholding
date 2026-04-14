@@ -1,6 +1,5 @@
 import argparse
 import json
-import os
 from pathlib import Path
 
 import torch
@@ -9,12 +8,10 @@ from torch import optim
 
 from preprocess_data import load_data_splits
 from model import Ecg1LeadCNN
-from config import CALIBRATED_DIR, CALIBRATED_MODEL_PATH, COST_SENSITIVE_DIR
-
-LAM_1_MODEL_PATH = os.path.join(COST_SENSITIVE_DIR, 'lam-1', 'lam-1.pt')
+from config import CALIBRATED_DIR, CALIBRATED_MODEL_PATH
 
 
-def calibrate(model_path=LAM_1_MODEL_PATH, device=None):
+def calibrate(model_path, device=None):
     if device is None:
         device = torch.device('cuda' if torch.cuda.is_available() else 'mps' if torch.backends.mps.is_available() else 'cpu')
     else:
@@ -89,8 +86,8 @@ def calibrate(model_path=LAM_1_MODEL_PATH, device=None):
 
 if __name__ == '__main__':
     parser = argparse.ArgumentParser(description='Temperature-scale the trained model on the validation set')
-    parser.add_argument('--model_path', type=str,  default=LAM_1_MODEL_PATH,    help=f'Path to the .pt model file to calibrate (default: {LAM_1_MODEL_PATH})')
-    parser.add_argument('--device',     type=str,  default=None,                help='Device to use, e.g. "cuda", "mps", "cpu" (default: auto-detect)')
+    parser.add_argument('--model_path', type=str,   required=True,  help='Path to the .pt model file to calibrate')
+    parser.add_argument('--device',     type=str,   default=None,   help='Device to use, e.g. "cuda", "mps", "cpu" (default: auto-detect)')
     args = parser.parse_args()
 
     calibrate(model_path=args.model_path, device=args.device)
