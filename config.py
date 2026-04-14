@@ -1,7 +1,5 @@
 import os
-import random
 
-import numpy as np
 import torch
 
 
@@ -10,16 +8,16 @@ import torch
 # Fixed random seed -- all RNGs rely on this
 RANDOM_SEED = 61
 
-RNG = random.Random(RANDOM_SEED)  # Python stdlib RNG
-NP_RNG = np.random.default_rng(RANDOM_SEED)  # NumPy RNG
-
-# PyTorch CPU and GPU RNG
-torch.manual_seed(RANDOM_SEED)  # CPU
-torch.cuda.manual_seed_all(RANDOM_SEED)  # GPU
-
 # Force deterministic CUDA kernels (trades some performance for reproducibility)
 torch.backends.cudnn.deterministic = True
 torch.backends.cudnn.benchmark = False
+
+def RESET_RANDOM_STATE():
+    """Re-seed RNGs to RANDOM_SEED. Call at the start of each training run."""
+    torch.manual_seed(RANDOM_SEED)
+    torch.cuda.manual_seed_all(RANDOM_SEED)
+
+RESET_RANDOM_STATE()  # seed on import
 
 # DATA PREPROCESSING CONFIG --------------------------------------------------------------------------------------------
 
@@ -44,6 +42,7 @@ CHECKPOINTS_DIR = os.path.join(MODEL_DIR, 'checkpoints')
 FINAL_MODEL_PATH = os.path.join(MODEL_DIR, 'final_model.pt')
 CALIBRATED_DIR = 'calibrated'
 CALIBRATED_MODEL_PATH = os.path.join(CALIBRATED_DIR, 'calibrated.pt')
+COST_SENSITIVE_DIR = 'cost_sensitive'
 
 # OTHER ----------------------------------------------------------------------------------------------------------------
 

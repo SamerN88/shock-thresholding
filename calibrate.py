@@ -1,6 +1,6 @@
-import os
 import argparse
 import json
+import os
 from pathlib import Path
 
 import torch
@@ -9,10 +9,12 @@ from torch import optim
 
 from preprocess_data import load_data_splits
 from model import Ecg1LeadCNN
-from config import FINAL_MODEL_PATH, CALIBRATED_DIR, CALIBRATED_MODEL_PATH
+from config import CALIBRATED_DIR, CALIBRATED_MODEL_PATH, COST_SENSITIVE_DIR
+
+LAM_1_MODEL_PATH = os.path.join(COST_SENSITIVE_DIR, 'lam-1', 'lam-1.pt')
 
 
-def calibrate(device=None):
+def calibrate(model_path=LAM_1_MODEL_PATH, device=None):
     if device is None:
         device = torch.device('cuda' if torch.cuda.is_available() else 'mps' if torch.backends.mps.is_available() else 'cpu')
     else:
@@ -20,11 +22,13 @@ def calibrate(device=None):
     print(f'[Using device "{device}"]\n')
 
     # Load trained model (weights frozen; only T is learned)
+    model_path = Path(model_path)
+    model_bundle = torch.load(model_path, map_location=device, weights_only=True)
     model = Ecg1LeadCNN().to(device)
-    model.load_state_dict(torch.load(FINAL_MODEL_PATH, map_location=device, weights_only=True))
+    model.load_state_dict(model_bundle['model_state_dict'])
     model.eval()
 
-    print(f'Calibrating model from:  {FINAL_MODEL_PATH}\n')
+    print(f'Calibrating model from:  {model_path}\n')
 
     # Load validation set only
     _, valid_loader, _ = load_data_splits()
@@ -72,10 +76,11 @@ def calibrate(device=None):
     # Save model state & temperature together so a single load gives everything needed for inference
     Path(CALIBRATED_DIR).mkdir(parents=True, exist_ok=True)
     pt_path = Path(CALIBRATED_MODEL_PATH)
-    torch.save({'model_state_dict': model.state_dict(), 'temperature': T}, pt_path)
+    model_bundle['temperature'] = T
+    torch.save(model_bundle, pt_path)
 
     # Copy the training metadata JSON and append the temperature
-    meta = json.loads(Path(FINAL_MODEL_PATH).with_suffix('.json').read_text())
+    meta = json.loads(model_path.with_suffix('.json').read_text())
     meta['temperature'] = T
     pt_path.with_suffix('.json').write_text(json.dumps(meta, indent=4))
 
@@ -84,7 +89,8 @@ def calibrate(device=None):
 
 if __name__ == '__main__':
     parser = argparse.ArgumentParser(description='Temperature-scale the trained model on the validation set')
-    parser.add_argument('--device', type=str, default=None, help='Device to use, e.g. "cuda", "mps", "cpu" (default: auto-detect)')
+    parser.add_argument('--model_path', type=str,  default=LAM_1_MODEL_PATH,    help=f'Path to the .pt model file to calibrate (default: {LAM_1_MODEL_PATH})')
+    parser.add_argument('--device',     type=str,  default=None,                help='Device to use, e.g. "cuda", "mps", "cpu" (default: auto-detect)')
     args = parser.parse_args()
 
-    calibrate(device=args.device)
+    calibrate(model_path=args.model_path, device=args.device)

@@ -110,14 +110,14 @@ class Ecg1LeadCNN(nn.Module):
         x = x.mean(dim=-1)              # x: (B, 256)           global average pooling
         return self.classifier(x)       # (B, 1)
 
-    def predict(self, x, threshold=0.5):                # x: (B, 1, 500)
+    def predict(self, x, temperature=1.0, threshold=0.5):                # x: (B, 1, 500)
         self.eval()
         x = x.to(device=next(self.parameters()).device)
         with torch.no_grad():
-            logits = self.forward(x)                    # logits: (B, 1)
-            probs = torch.sigmoid(logits)               # probs:  (B, 1)
-            preds = (probs >= threshold).long()         # preds:  (B, 1)
-        return preds.squeeze(-1).cpu().numpy()          # (B,)  SHOCKABLE(1) / NON_SHOCKABLE(0)
+            logits = self.forward(x)                        # logits: (B, 1)
+            probs = torch.sigmoid(logits / temperature)     # probs:  (B, 1)
+            preds = (probs >= threshold).long()             # preds:  (B, 1)
+        return preds.squeeze(-1).cpu().numpy()              # (B,)  SHOCKABLE(1) / NON_SHOCKABLE(0)
 
 
 def samepad(kernel_size):

@@ -14,6 +14,7 @@ from model import Ecg1LeadCNN
 from util import Stopwatch, fmt_sec, flint
 from config import (
     RANDOM_SEED,
+    RESET_RANDOM_STATE,
     BATCH_SIZE,
     INIT_LEARNING_RATE,
     EPOCHS,
@@ -26,6 +27,8 @@ from config import (
 
 
 def train(cost_ratio=None, resume=False, batch_size=None, lr=None, epochs=None, device=None):
+    RESET_RANDOM_STATE()
+
     if device is None:
         device = torch.device('cuda' if torch.cuda.is_available() else 'mps' if torch.backends.mps.is_available() else 'cpu')
     else:
@@ -71,7 +74,7 @@ def train(cost_ratio=None, resume=False, batch_size=None, lr=None, epochs=None, 
         if start_epoch > epochs:
             print('\nTraining already complete. Nothing to do.')
             print(f'(Increase epochs above {start_epoch-1} to continue training.)')
-            return
+            return False
         if explicit_lr is not None:
             # Override the checkpoint's LR and reset the scheduler so it treats the new LR as its
             # starting point — without this, the old scheduler state could immediately reduce the
@@ -82,7 +85,7 @@ def train(cost_ratio=None, resume=False, batch_size=None, lr=None, epochs=None, 
             print(f'LR overridden to {explicit_lr}; LR scheduler reset.')
     else:
         if not _setup_fresh_run():
-            return
+            return False
         start_epoch = 1
 
     # Load training and validation sets (not test).
@@ -196,6 +199,8 @@ def train(cost_ratio=None, resume=False, batch_size=None, lr=None, epochs=None, 
     print('-' * 50)
     print()
 
+    return True
+
 
 def _validate(model, loss_fxn, data_loader, device, desc=None):
     """One pass over data_loader; returns (valid_loss, acc, FPR, FNR)."""
@@ -204,10 +209,11 @@ def _validate(model, loss_fxn, data_loader, device, desc=None):
     with torch.no_grad():
         # Validation loop
         for segs, labels in tqdm(data_loader, desc=desc, leave=False):
-            segs, labels = segs.to(device), labels.to(device)
+            segs = segs.to(device)
+            labels = labels.to(device)
             logits = model(segs)
             valid_loss += loss_fxn(logits.squeeze(-1), labels.float()).item()
-            preds = (torch.sigmoid(logits.squeeze(-1)) >= 0.5).long().cpu().numpy()  # 0.5 is training-time diagnostic only; final eval uses θ*(λ)
+            preds = (torch.sigmoid(logits.squeeze(-1)) >= 0.5).long().cpu().numpy()  # 0.5 is a training diagnostic only; final eval uses θ*(λ)
             labels = labels.cpu().numpy()
             tp += ((preds == 1) & (labels == 1)).sum()
             fp += ((preds == 1) & (labels == 0)).sum()
@@ -227,7 +233,7 @@ def _setup_fresh_run():
             confirm = input(f'\nWARNING: {MODEL_DIR + os.path.sep} is non-empty. THIS WILL DELETE ALL EXISTING CHECKPOINTS AND MODELS.\nType "yes" to confirm: ')
         except KeyboardInterrupt:
             print('\n\nAborted.')
-            exit()
+            return False
         if confirm.strip().lower() != 'yes':
             print('\nAborted.')
             return False
@@ -275,7 +281,11 @@ def _load_latest_checkpoint(model, optimizer, scheduler):
 
 def _save_final_model(model, meta):
     pt_path = Path(FINAL_MODEL_PATH)
-    torch.save(model.state_dict(), pt_path)  # weights only; optimizer/scheduler state not needed post-training
+    torch.save({
+        'model_state_dict': model.state_dict(),
+        'cost_ratio': meta['cost_ratio'],
+        'temperature': 1.0  # uncalibrated; may be updated by calibrate.py
+    }, pt_path)
     pt_path.with_suffix('.json').write_text(json.dumps(meta, indent=4))
     print(f'\nDone training. Final model saved:  {pt_path}')
 
