@@ -31,7 +31,7 @@ SPLITS_NPZ_PATH = os.path.join('data', 'splits.npz')  # path for saving our data
 
 BATCH_SIZE = 64
 INIT_LEARNING_RATE = 0.01
-EPOCHS = 1
+EPOCHS = 150
 LR_SCHEDULE_FACTOR = 0.5  # multiply LR by this on plateau
 LR_SCHEDULE_PATIENCE = 15  # number of epochs without valid_loss improvement before reducing LR
 
