@@ -43,15 +43,15 @@ def fmt_sec(seconds: float) -> str:
 
 
 class Glyphs:
-    dH = chr(0x2550)   # ═
-    dV = chr(0x2551)   # ║
-    dDR = chr(0x2554)  # ╔
-    dDL = chr(0x2557)  # ╗
-    dUR = chr(0x255A)  # ╚
-    dUL = chr(0x255D)  # ╝
-    dVR = chr(0x2560)  # ╠
-    dVL = chr(0x2563)  # ╣
-    dHD = chr(0x2566)  # ╦
-    dHU = chr(0x2569)  # ╩
-    d4 = chr(0x256C)   # ╬
-    bul = chr(0x2022)  # •
+    dH = chr(0x2550)   # ═  double horizontal
+    dV = chr(0x2551)   # ║  double vertical
+    dDR = chr(0x2554)  # ╔  double down right
+    dDL = chr(0x2557)  # ╗  double down left
+    dUR = chr(0x255A)  # ╚  double up right
+    dUL = chr(0x255D)  # ╝  double up left
+    dVR = chr(0x2560)  # ╠  double vertical right
+    dVL = chr(0x2563)  # ╣  double vertical left
+    dHD = chr(0x2566)  # ╦  double horizontal down
+    dHU = chr(0x2569)  # ╩  double horizontal up
+    d4 = chr(0x256C)   # ╬  double 4-way intersection
+    bul = chr(0x2022)  # •  bullet
