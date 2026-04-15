@@ -187,17 +187,26 @@ def train(pos_weight=None, resume=False, batch_size=None, lr=None, epochs=None, 
         # Save a checkpoint (model and training state) each epoch
         _save_checkpoint(epoch, model, optimizer, scheduler, info)
 
-    # When training ends, save the final model and some info
-    _save_final_model(model, info)
+    # Scan all checkpoints, select the best by valid_loss, and save it as the final model
+    best_valid_loss, best_epoch = _find_best_checkpoint()
+    best_checkpoint_path = Path(CHECKPOINTS_DIR) / f'checkpoint-{best_epoch}.pt'
+    best_info = json.loads((Path(CHECKPOINTS_DIR) / f'checkpoint-{best_epoch}.json').read_text())
+    best_checkpoint = torch.load(best_checkpoint_path, weights_only=False)
+    model.load_state_dict(best_checkpoint['model_state_dict'])
+
+    # Save the final model (best checkpoint)
+    final_model_path = _save_final_model(model, best_info)
+    print(f'\nBEST EPOCH SAVED AS FINAL MODEL (Epoch {best_epoch}, valid_loss={best_valid_loss:.5f}):  {final_model_path}')
 
     print()
     print('-'*70)
-    print('Final stats:')
-    print(f'    train_loss = {train_loss:.5f}')
-    print(f'    valid_loss = {valid_loss:.5f}')
-    print(f'    FPR        = {fpr:.5f}')
-    print(f'    FNR        = {fnr:.5f}')
-    print(f'    acc        = {acc:.5f}')
+    print('Final stats (best epoch):')
+    print(f'    epoch      = {best_epoch}')
+    print(f'    train_loss = {best_info["train_loss"]:.5f}')
+    print(f'    valid_loss = {best_info["valid_loss"]:.5f}')
+    print(f'    FPR        = {best_info["fpr"]:.5f}')
+    print(f'    FNR        = {best_info["fnr"]:.5f}')
+    print(f'    acc        = {best_info["acc"]:.5f}')
     print()
     print(f'Total runtime: {fmt_sec(sw.total_elapsed())}')
     print('-'*70)
@@ -227,6 +236,18 @@ def _validate(model, loss_fxn, data_loader, device, desc=None):
     fpr = fp / (fp + tn) if (fp + tn) > 0 else 0.0
     fnr = fn / (fn + tp) if (fn + tp) > 0 else 0.0
     return valid_loss, acc, fpr, fnr
+
+
+def _find_best_checkpoint():
+    """Scan all checkpoint JSONs and return (best_valid_loss, best_epoch). Returns (inf, None) if none exist."""
+    best_valid_loss = float('inf')
+    best_epoch = None
+    for cp_json in Path(CHECKPOINTS_DIR).glob('checkpoint-*.json'):
+        cp_info = json.loads(cp_json.read_text())
+        if cp_info['valid_loss'] < best_valid_loss:
+            best_valid_loss = cp_info['valid_loss']
+            best_epoch = cp_info['epoch']
+    return best_valid_loss, best_epoch
 
 
 def _setup_fresh_run():
@@ -291,7 +312,7 @@ def _save_final_model(model, info):
         'temperature': 1.0  # uncalibrated; may be updated by calibrate.py
     }, pt_path)
     pt_path.with_suffix('.json').write_text(json.dumps(info, indent=4))
-    print(f'\nDone training. Final model saved:  {pt_path}')
+    return pt_path
 
 
 if __name__ == '__main__':
