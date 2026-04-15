@@ -16,16 +16,16 @@ from config import (
 
 
 # Special characters, just for pretty display
-dH = Glyphs.dH
 dV = Glyphs.dV
-dDR = Glyphs.dDR
-dDL = Glyphs.dDL
-dUR = Glyphs.dUR
+dH = Glyphs.dH
 dUL = Glyphs.dUL
-dVR = Glyphs.dVR
-dVL = Glyphs.dVL
-dHD = Glyphs.dHD
-dHU = Glyphs.dHU
+dUR = Glyphs.dUR
+dDL = Glyphs.dDL
+dDR = Glyphs.dDR
+d3U = Glyphs.d3U
+d3D = Glyphs.d3D
+d3L = Glyphs.d3L
+d3R = Glyphs.d3R
 d4 = Glyphs.d4
 bul = Glyphs.bul
 
@@ -36,7 +36,7 @@ def main():
 
     print(dDR + dH*70 + dDL)
     print(dV + 'APPROACH 1: COST-SENSITIVE THRESHOLDING'.center(70) + dV)
-    print(dVR + dH*70 + dVL)
+    print(d3R + dH * 70 + d3L)
     print(dV + f'   {bul} Train 1 model with pos_weight=1.0'.ljust(70) + dV)
     print(dV + f'   {bul} Calibrate via temperature scaling'.ljust(70) + dV)
     print(dV + f"   {bul} Evaluate at Elkan's optimal threshold θ*(λ) = 1/(λ+1) for".ljust(70) + dV)
