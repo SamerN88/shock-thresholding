@@ -76,10 +76,10 @@ def calibrate(model_path, device=None):
     model_bundle['temperature'] = T
     torch.save(model_bundle, pt_path)
 
-    # Copy the training metadata JSON and append the temperature
-    meta = json.loads(model_path.with_suffix('.json').read_text())
-    meta['temperature'] = T
-    pt_path.with_suffix('.json').write_text(json.dumps(meta, indent=4))
+    # Copy the training info JSON and append the temperature
+    info = json.loads(model_path.with_suffix('.json').read_text())
+    info['temperature'] = T
+    pt_path.with_suffix('.json').write_text(json.dumps(info, indent=4))
 
     print(f'\nCalibrated model saved to:  {CALIBRATED_MODEL_PATH}')
 

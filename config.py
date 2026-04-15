@@ -27,13 +27,14 @@ MAX_NAN_GAP_SEC = 0.1*WINDOW_SEC  # for NaNs in ECG samples, linearly interpolat
 NORMALIZE = True  # normalize ECG segments (per-segment)
 SPLITS_NPZ_PATH = os.path.join('data', 'splits.npz')  # path for saving our data splits in a .npz file (using NumPy)
 
-# TRAINING CONFIG ------------------------------------------------------------------------------------------------------
+# TRAINING CONFIG (TUNED) ----------------------------------------------------------------------------------------------
 
 BATCH_SIZE = 64
-INIT_LEARNING_RATE = 0.01
-EPOCHS = 150
+INIT_LEARNING_RATE = 1e-3
+EPOCHS = 50
 LR_SCHEDULE_FACTOR = 0.5  # multiply LR by this on plateau
-LR_SCHEDULE_PATIENCE = 15  # number of epochs without valid_loss improvement before reducing LR
+LR_SCHEDULE_PATIENCE = 10  # number of epochs without valid_loss improvement before reducing LR
+WEIGHT_DECAY = 1e-4
 
 # MODEL PATHS ----------------------------------------------------------------------------------------------------------
 

@@ -91,7 +91,10 @@ class Ecg1LeadCNN(nn.Module):
         # Here, L is the ECG seg length, i.e. num samples
 
         # Stem has one job: convert a raw signal into a spatial feature map at reduced resolution
-        self.stem = nn.Conv1d(in_channels=1, out_channels=32, kernel_size=25, stride=2, padding=samepad(25), bias=False)  # (B, 32, L/2)
+        self.stem = nn.Sequential(
+            nn.Conv1d(in_channels=1, out_channels=32, kernel_size=25, stride=2, padding=samepad(25), bias=False),  # (B, 32, L/2)
+            nn.Dropout(0.2)
+        )
         self.blocks = nn.Sequential(
             SEResNet(in_channels=32, out_channels=64, kernel_size=15, stride=2, reduction=8),   # (B, 64, L/4)
             SEResNet(in_channels=64, out_channels=128, kernel_size=7, stride=2, reduction=8),   # (B, 128, L/8)
@@ -101,7 +104,10 @@ class Ecg1LeadCNN(nn.Module):
             nn.BatchNorm1d(256),    # (B, 256, L/16)
             nn.ReLU()               # (B, 256, L/16)
         )
-        self.classifier = nn.Linear(256, 1)  # (B, 1)
+        self.classifier = nn.Sequential(
+            nn.Dropout(0.3),
+            nn.Linear(256, 1)  # (B, 1)
+        )
 
     def forward(self, x):               # x: (B, 1, L)
         x = self.stem(x)                # x: (B, 32, L/2)       convert a raw signal into a spatial feature map at reduced resolution

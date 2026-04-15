@@ -20,6 +20,7 @@ from config import (
     EPOCHS,
     LR_SCHEDULE_FACTOR,
     LR_SCHEDULE_PATIENCE,
+    WEIGHT_DECAY,
     MODEL_DIR,
     CHECKPOINTS_DIR,
     FINAL_MODEL_PATH
@@ -64,11 +65,15 @@ def train(pos_weight=None, resume=False, batch_size=None, lr=None, epochs=None, 
     if epochs <= 0:
         raise ValueError('epochs must be positive')
 
+    # Factory function to create LR scheduler given an optimizer
+    def _make_lr_scheduler(_optimizer):
+        return optim.lr_scheduler.ReduceLROnPlateau(_optimizer, mode='min', factor=LR_SCHEDULE_FACTOR, patience=LR_SCHEDULE_PATIENCE)
+
     # Instantiate model, loss function, optimizer, and LR scheduler
     model = Ecg1LeadCNN().to(device)
     loss_fxn = nn.BCEWithLogitsLoss(pos_weight=torch.tensor(float(pos_weight)).to(device))
-    optimizer = optim.Adam(params=model.parameters(), lr=lr, weight_decay=1e-4)
-    scheduler = optim.lr_scheduler.ReduceLROnPlateau(optimizer, mode='min', factor=LR_SCHEDULE_FACTOR, patience=LR_SCHEDULE_PATIENCE)
+    optimizer = optim.AdamW(params=model.parameters(), lr=lr, weight_decay=WEIGHT_DECAY)
+    scheduler = _make_lr_scheduler(optimizer)
 
     # Optionally resume training from a previously saved run
     if resume:
@@ -78,12 +83,12 @@ def train(pos_weight=None, resume=False, batch_size=None, lr=None, epochs=None, 
             print(f'(Increase epochs above {start_epoch-1} to continue training.)')
             return False
         if explicit_lr is not None:
-            # Override the checkpoint's LR and reset the scheduler so it treats the new LR as its
-            # starting point — without this, the old scheduler state could immediately reduce the
-            # new LR if it thinks training has been on a plateau
+            # Override the checkpoint's LR and reset the scheduler so it treats the new LR as its starting point;
+            # without this, the old scheduler state could immediately reduce the new LR if it thinks training has
+            # been on a plateau
             for param_group in optimizer.param_groups:
                 param_group['lr'] = explicit_lr
-            scheduler = optim.lr_scheduler.ReduceLROnPlateau(optimizer, mode='min', factor=LR_SCHEDULE_FACTOR, patience=LR_SCHEDULE_PATIENCE)
+            scheduler = _make_lr_scheduler(optimizer)
             print(f'LR overridden to {explicit_lr}; LR scheduler reset.')
     else:
         if not _setup_fresh_run():
@@ -162,7 +167,7 @@ def train(pos_weight=None, resume=False, batch_size=None, lr=None, epochs=None, 
         print(f'Epoch {f"{epoch}:".ljust(4)}    train_loss={train_loss:.5f}  valid_loss={valid_loss:.5f}  FPR={fpr:.5f}  FNR={fnr:.5f}  acc={acc:.5f}  lr={current_lr}  epoch_runtime={fmt_sec(epoch_runtime)}  ETA={fmt_sec(ETA)}')
 
         # Info we save to a JSON for each epoch
-        meta = {
+        info = {
             'epoch': epoch,
             'total_epochs': epochs,
             'batch_size': batch_size,
@@ -170,6 +175,7 @@ def train(pos_weight=None, resume=False, batch_size=None, lr=None, epochs=None, 
             'current_lr': current_lr,
             'lr_schedule_factor': LR_SCHEDULE_FACTOR,
             'lr_schedule_patience': LR_SCHEDULE_PATIENCE,
+            'weight_decay': WEIGHT_DECAY,
             'train_loss': train_loss,
             'valid_loss': valid_loss,
             'pos_weight': pos_weight,
@@ -179,10 +185,10 @@ def train(pos_weight=None, resume=False, batch_size=None, lr=None, epochs=None, 
         }
 
         # Save a checkpoint (model and training state) each epoch
-        _save_checkpoint(epoch, model, optimizer, scheduler, meta)
+        _save_checkpoint(epoch, model, optimizer, scheduler, info)
 
     # When training ends, save the final model and some info
-    _save_final_model(model, meta)
+    _save_final_model(model, info)
 
     print()
     print('-'*70)
@@ -240,7 +246,7 @@ def _setup_fresh_run():
     return True
 
 
-def _save_checkpoint(epoch, model, optimizer, scheduler, meta):
+def _save_checkpoint(epoch, model, optimizer, scheduler, info):
     base = Path(CHECKPOINTS_DIR) / f'checkpoint-{epoch}'
     torch.save({
         'epoch': epoch,
@@ -248,7 +254,7 @@ def _save_checkpoint(epoch, model, optimizer, scheduler, meta):
         'optimizer_state_dict': optimizer.state_dict(),
         'scheduler_state_dict': scheduler.state_dict(),
     }, base.with_suffix('.pt'))
-    base.with_suffix('.json').write_text(json.dumps(meta, indent=4))
+    base.with_suffix('.json').write_text(json.dumps(info, indent=4))
 
 
 def _peek_checkpoint_config():
@@ -277,14 +283,14 @@ def _load_latest_checkpoint(model, optimizer, scheduler):
     return start_epoch
 
 
-def _save_final_model(model, meta):
+def _save_final_model(model, info):
     pt_path = Path(FINAL_MODEL_PATH)
     torch.save({
         'model_state_dict': model.state_dict(),
-        'pos_weight': meta['pos_weight'],
+        'pos_weight': info['pos_weight'],
         'temperature': 1.0  # uncalibrated; may be updated by calibrate.py
     }, pt_path)
-    pt_path.with_suffix('.json').write_text(json.dumps(meta, indent=4))
+    pt_path.with_suffix('.json').write_text(json.dumps(info, indent=4))
     print(f'\nDone training. Final model saved:  {pt_path}')
 
 

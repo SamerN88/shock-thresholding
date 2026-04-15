@@ -40,7 +40,7 @@ def main():
             print(f'Error while training Approach 2 model (λ={cost_ratio}). Exiting.')
             return
 
-        # Move the trained model and metadata to a dedicated directory
+        # Move the trained model and training info to a dedicated directory
         cs_model_dir = os.path.join(COST_SENSITIVE_DIR, f'lam-{cost_ratio}')
         Path(cs_model_dir).mkdir(parents=True, exist_ok=True)
         cs_model_path = Path(os.path.join(cs_model_dir, f'lam-{cost_ratio}.pt'))
