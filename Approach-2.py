@@ -76,7 +76,7 @@ def main():
     for cost_ratio in COST_RATIOS:
         print(f'COST RATIO:  λ = {cost_ratio}\n')
         model_path = os.path.join(COST_SENSITIVE_DIR, f'lam-{cost_ratio}', f'lam-{cost_ratio}.pt')
-        evaluate(model_path=model_path, threshold=0.5, cost_ratio=cost_ratio, show_device=False)
+        evaluate(model_path=model_path, cost_ratio=cost_ratio, threshold=0.5)
         print('\n' + dH*100 + '\n')
 
 
