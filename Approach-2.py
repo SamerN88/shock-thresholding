@@ -62,7 +62,7 @@ def main():
         # Delete model/ directory to prepare for the next run (final weights already moved to COST_SENSITIVE_DIR)
         shutil.rmtree(MODEL_DIR)
 
-        print(f'\nMoved model to {cs_model_dir + os.path.sep}')
+        print(f'\nMoved model to:  {cs_model_dir + os.path.sep}')
         print('\n' + dH*100 + '\n')
 
     print('\n')
