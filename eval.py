@@ -9,13 +9,16 @@ from preprocess_data import load_data_splits
 from model import Ecg1LeadCNN
 
 
-def evaluate(model_path, threshold=0.5, cost_ratio=None, device=None):
+def evaluate(model_path, threshold=0.5, cost_ratio=None, device=None, show_device=True):
     if device is None:
         device = torch.device('cuda' if torch.cuda.is_available() else 'mps' if torch.backends.mps.is_available() else 'cpu')
     else:
         device = torch.device(device)
-    print(f'[Using device "{device}"]\n')
 
+    if show_device:
+        print(f'[Using device "{device}"]\n')
+
+    # Load model, pos_weight, and temperature
     model_path = Path(model_path)
     bundle = torch.load(model_path, map_location=device, weights_only=True)
     model = Ecg1LeadCNN().to(device)

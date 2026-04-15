@@ -200,7 +200,7 @@ def train(pos_weight=None, resume=False, batch_size=None, lr=None, epochs=None, 
 
     print()
     print('-'*70)
-    print('Final stats (best epoch):')
+    print('Final metrics (best epoch):')
     print(f'    epoch      = {best_epoch}')
     print(f'    train_loss = {best_info["train_loss"]:.5f}')
     print(f'    valid_loss = {best_info["valid_loss"]:.5f}')

@@ -4,6 +4,7 @@ from pathlib import Path
 
 from train import train
 from eval import evaluate
+from util import Glyphs
 from config import (
     RESET_RANDOM_STATE,
     MODEL_DIR,
@@ -13,19 +14,30 @@ from config import (
 )
 
 
+# Special characters, just for pretty display
+dH = Glyphs.dH
+dV = Glyphs.dV
+dDR = Glyphs.dDR
+dDL = Glyphs.dDL
+dUR = Glyphs.dUR
+dUL = Glyphs.dUL
+dVR = Glyphs.dVR
+dVL = Glyphs.dVL
+bul = Glyphs.bul
+
+
 # Convenient orchestration script to run the entire pipeline for Approach 2 (cost-sensitive training)
 def main():
     RESET_RANDOM_STATE()
-
-    print('=' * 70)
-    print('APPROACH 2: COST-SENSITIVE TRAINING'.center(70))
-    print('=' * 70)
-    print(f'  - Train {len(COST_RATIOS)} cost-sensitive models with')
-    print(f'        pos_weight = λ = {", ".join(map(str, COST_RATIOS))}')
-    print(f'  - Evaluate at the default threshold θ=0.5 (no calibration)')
-    print()
-    print(f'Saving all models to:  {COST_SENSITIVE_DIR + os.path.sep}')
-    print('=' * 70)
+    print(dDR + dH*70 + dDL)
+    print(dV + 'APPROACH 2: COST-SENSITIVE TRAINING'.center(70) + dV)
+    print(dVR + dH*70 + dVL)
+    print(dV + f'   {bul} Train {len(COST_RATIOS)} cost-sensitive models with'.ljust(70) + dV)
+    print(dV + f'        pos_weight = λ = {", ".join(map(str, COST_RATIOS))}'.ljust(70) + dV)
+    print(dV + f'   {bul} Evaluate each model at default threshold θ=0.5 (no calibration)'.ljust(70) + dV)
+    print(dV + ' '*70 + dV)
+    print(dV + f' Saving all models to:  {COST_SENSITIVE_DIR + os.path.sep}'.ljust(70) + dV)
+    print(dUR + dH*70 + dUL)
     print('\n\n')
 
     # Ensure directory for storing λ-aware models exists
@@ -36,7 +48,7 @@ def main():
         ok = train(pos_weight=cost_ratio)
         if not ok:
             print()
-            print('='*100)
+            print(dH*70)
             print(f'Error while training Approach 2 model (λ={cost_ratio}). Exiting.')
             return
 
@@ -50,21 +62,22 @@ def main():
         # Delete model/ directory to prepare for the next run (final weights already moved to COST_SENSITIVE_DIR)
         shutil.rmtree(MODEL_DIR)
 
-        print('\n' + '='*100 + '\n')
+        print(f'\nMoved model to {cs_model_dir + os.path.sep}')
+        print('\n' + dH*100 + '\n')
 
     print('\n')
-    print('=' * 100)
-    print('APPROACH 2 EVALUATION'.center(100))
-    print(f'pos_weight = λ,  threshold = 0.5,  Not calibrated'.center(100))
-    print('=' * 100)
+    print(dDR + dH*98 + dDL)
+    print(dV + 'APPROACH 2 EVALUATION'.center(98) + dV)
+    print(dV + f'pos_weight = λ,  threshold = 0.5,  Not calibrated'.center(98) + dV)
+    print(dUR + dH*98 + dUL)
     print()
 
     # Evaluate each λ-aware model at default threshold θ=0.5
     for cost_ratio in COST_RATIOS:
         print(f'COST RATIO:  λ = {cost_ratio}\n')
         model_path = os.path.join(COST_SENSITIVE_DIR, f'lam-{cost_ratio}', f'lam-{cost_ratio}.pt')
-        evaluate(model_path=model_path, threshold=0.5, cost_ratio=cost_ratio)
-        print('\n' + '='*100 + '\n')
+        evaluate(model_path=model_path, threshold=0.5, cost_ratio=cost_ratio, show_device=False)
+        print('\n' + dH*100 + '\n')
 
 
 if __name__ == '__main__':

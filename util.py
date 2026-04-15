@@ -40,3 +40,18 @@ def fmt_sec(seconds: float) -> str:
     secs = int(seconds % 60)
 
     return f"{hours}h{minutes}m{secs}s"
+
+
+class Glyphs:
+    dH = chr(0x2550)   # ═
+    dV = chr(0x2551)   # ║
+    dDR = chr(0x2554)  # ╔
+    dDL = chr(0x2557)  # ╗
+    dUR = chr(0x255A)  # ╚
+    dUL = chr(0x255D)  # ╝
+    dVR = chr(0x2560)  # ╠
+    dVL = chr(0x2563)  # ╣
+    dHD = chr(0x2566)  # ╦
+    dHU = chr(0x2569)  # ╩
+    d4 = chr(0x256C)   # ╬
+    bul = chr(0x2022)  # •
