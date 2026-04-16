@@ -50,4 +50,4 @@ COST_SENSITIVE_DIR = 'cost_sensitive'
 # Labels
 SHOCKABLE = 1
 NON_SHOCKABLE = 0
-COST_RATIOS = [1.0, 2.0, 5.0, 10.0, 100.0]  # TODO: replace these dummy values with clinically-grounded cost ratios
+COST_RATIOS = [1.0, 2.0, 5.0, 10.0, 20.0]
