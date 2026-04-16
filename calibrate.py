@@ -2,6 +2,7 @@ import argparse
 import json
 from pathlib import Path
 
+import numpy as np
 import torch
 import torch.nn as nn
 from torch import optim
@@ -43,10 +44,13 @@ def calibrate(model_path, device=None):
     all_logits = torch.tensor(all_logits).squeeze(-1)
     all_labels = torch.tensor(all_labels).float()
 
-    # Compute NLL loss before calibration
-    # (NOTE: BCE is NLL for binary classification; NLL generalizes to multi-class)
+    # Use NLL as our loss function (BCE is NLL for binary classification; NLL generalizes to multi-class)
     nll = nn.BCEWithLogitsLoss()
+
+    # Compute NLL and ECE before calibration
+    probs_before = torch.sigmoid(all_logits)
     nll_before = nll(all_logits, all_labels).item()
+    ece_before = compute_ece(probs_before, all_labels, n_bins=10)
 
     # Learn T by minimizing NLL on the validation logits (Guo et al. 2017)
     # Logits and temperature stay on CPU since this is a small 1D convex optimization
@@ -62,14 +66,20 @@ def calibrate(model_path, device=None):
 
     # Full L-BFGS run up to max_iter=1000 (NOT a single L-BFGS step)
     optimizer.step(objective)
+    T = temperature.item()  # final optimized T
 
-    # Compute NLL loss after calibration
-    T = temperature.item()
+    # Compute NLL and ECE after calibration
+    probs_after = torch.sigmoid(all_logits / T)
     nll_after = nll(all_logits / T, all_labels).item()
+    ece_after = compute_ece(probs_after, all_labels, n_bins=10)
 
-    print(f'Temperature (T):         {T:.5f}')
-    print(f'NLL before calibration:  {nll_before:.5f}')
-    print(f'NLL after calibration:   {nll_after:.5f}')
+    print(f'Done.\nTemperature (T):  {T:.5f}\n')
+    print('Before calibration:')
+    print(f'    NLL:  {nll_before:.5f}')
+    print(f'    ECE:  {ece_before:.5f}')
+    print('After calibration:')
+    print(f'    NLL:  {nll_after:.5f}')
+    print(f'    ECE:  {ece_after:.5f}')
 
     # Save model state & temperature together so a single load gives everything needed for inference
     Path(CALIBRATED_DIR).mkdir(parents=True, exist_ok=True)
@@ -83,6 +93,27 @@ def calibrate(model_path, device=None):
     pt_path.with_suffix('.json').write_text(json.dumps(info, indent=4))
 
     print(f'\nCalibrated model saved to:  {CALIBRATED_MODEL_PATH}')
+
+
+def compute_ece(probs, labels, n_bins):
+    probs = np.asarray(probs, dtype=float)
+    labels = np.asarray(labels, dtype=float)
+
+    bins = np.linspace(0, 1, n_bins + 1)
+    ece = 0
+    for i in range(n_bins):
+        mask = (
+            (probs >= bins[i]) & (probs < bins[i + 1])
+            if i < n_bins - 1 else
+            (probs >= bins[i]) & (probs <= bins[i + 1])
+        )
+        if mask.sum() == 0:
+            continue
+        bin_conf = probs[mask].mean()  # bin confidence
+        bin_acc = labels[mask].mean()  # bin accuracy
+        ece += (mask.sum() / len(probs)) * abs(bin_acc - bin_conf)
+
+    return ece
 
 
 if __name__ == '__main__':
