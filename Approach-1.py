@@ -72,7 +72,7 @@ def main():
     for cost_ratio in COST_RATIOS:
         print(f'COST RATIO:  λ = {cost_ratio}\n')
         opt_threshold = 1 / (cost_ratio + 1)
-        evaluate(model_path=CALIBRATED_MODEL_PATH, cost_ratio=cost_ratio, threshold=opt_threshold)
+        evaluate(model_path=CALIBRATED_MODEL_PATH, cost_ratio=cost_ratio, threshold=opt_threshold, dataset='test')
         print('\n' + dH*100 + '\n')
 
 
