@@ -25,7 +25,8 @@ def calibrate(model_path, device=None):
     model.load_state_dict(model_bundle['model_state_dict'])
     model.eval()
 
-    print(f'Calibrating model from:  {model_path}\n')
+    print(f'Calibrating model from:  {model_path}')
+    print('(using validation set)\n')
 
     # Load validation set only
     _, valid_loader, _ = load_data_splits()
