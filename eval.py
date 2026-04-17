@@ -7,7 +7,7 @@ from tqdm import tqdm
 
 from preprocess_data import load_data_splits
 from model import Ecg1LeadCNN
-from util import metrics, MC
+from util import metrics, EC
 
 
 def evaluate(model_path, *, cost_ratio, threshold=0.5, dataset="test", device=None):
@@ -80,12 +80,12 @@ def evaluate(model_path, *, cost_ratio, threshold=0.5, dataset="test", device=No
     # Compute performance metrics
     loss /= len(data_loader)
     acc, tp, fp, tn, fn, fpr, fnr = metrics(all_preds, all_labels)
-    mc_lam = MC(all_preds, all_labels, cost_ratio)
+    ec_lam = EC(all_preds, all_labels, cost_ratio)
 
     print('-'*70)
     print(f'Performance metrics (dataset: "{dataset}"):')
     print(f'    loss  = {loss:.5f}')
-    print(f'    MC(λ) = {mc_lam:.5f}')
+    print(f'    EC(λ) = {ec_lam:.5f}')
     print(f'    FPR   = {fpr:.5f}')
     print(f'    FNR   = {fnr:.5f}')
     print(f'    acc   = {acc:.5f}')
@@ -98,7 +98,7 @@ def evaluate(model_path, *, cost_ratio, threshold=0.5, dataset="test", device=No
 if __name__ == '__main__':
     parser = argparse.ArgumentParser(description='Evaluate a trained model on a dataset')
     parser.add_argument('--model_path', type=str,   required=True,  help='Path to the .pt model file')
-    parser.add_argument('--cost_ratio', type=float, required=True,  help='Cost ratio λ for MC(λ) evaluation')
+    parser.add_argument('--cost_ratio', type=float, required=True,  help='Cost ratio λ for EC(λ) evaluation')
     parser.add_argument('--threshold',  type=float, default=0.5,    help='Decision threshold θ; use 1/(λ+1) for A1 cost-sensitive eval (default: 0.5)')
     parser.add_argument('--dataset',    type=str,   default="test", help='Dataset to evaluate on; "train", "valid", or "test" (default: "test")')
     parser.add_argument('--device',     type=str,   default=None,   help='Device to use, e.g. "cuda", "mps", "cpu" (default: auto-detect)')

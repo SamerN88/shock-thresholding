@@ -60,13 +60,36 @@ def metrics(preds, labels):
     return acc, tp, fp, tn, fn, fpr, fnr
 
 
-def MC(preds, labels, cost_ratio):
+def EC(preds, labels, cost_ratio):
     """
-    Computes the core performance metric MC(λ) = FPR + λ*FNR (misclassification cost w.r.t. cost ratio λ).
-    MC(λ) is the most important metric for comparing A1 and A2 as it estimates the "clinical cost".
+    Computes the primary evaluation metric
+
+        EC(λ)  =  P(Y=0)·FPR + λ·P(Y=1)·FNR  =  (FP + λ·FN) / N
+
+    EC(λ) is the expected cost per example (under our data's class distribution) given a
+    certain cost ratio λ. This is the main metric we use for comparing A1 vs. A2. It's
+    easy to see that this quantity is an expectation; first define:
+
+        - P(FP) = FP/N,  C_FP = 1
+        - P(FN) = FN/N,  C_FN = λ
+
+    where C_FP is the cost of a FP, and P(FP) is the probability of getting a FP on a
+    randomly drawn example from our dataset; likewise for FN (FP = inappropriate shock,
+    FN = missed shock). Thus, classifying a randomly drawn example from this dataset has
+    an expected cost of
+
+        E[cost] = C_FP·P(FP) + C_FN·P(FN)
+                = 1·FP/N + λ·FN/N
+
+    Hence we write EC(λ) = (FP + λ·FN) / N. Note that EC(λ) is the average misclassification
+    cost per example, which both A1 and A2 are theoretically designed to minimize.
     """
-    *_, fpr, fnr = metrics(preds, labels)
-    return fpr + cost_ratio * fnr
+    preds = np.asarray(preds)
+    labels = np.asarray(labels)
+    fp = ((preds == 1) & (labels == 0)).sum()
+    fn = ((preds == 0) & (labels == 1)).sum()
+    n = len(labels)
+    return (fp + cost_ratio * fn) / n
 
 
 def elkan_optimal_threshold(cost_ratio):
