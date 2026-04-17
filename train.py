@@ -11,7 +11,7 @@ from tqdm import tqdm
 
 from preprocess_data import load_data_splits
 from model import Ecg1LeadCNN
-from util import Stopwatch, fmt_sec
+from util import Stopwatch, fmt_sec, metrics
 from config import (
     RANDOM_SEED,
     RESET_RANDOM_STATE,
@@ -216,8 +216,11 @@ def train(pos_weight=None, resume=False, batch_size=None, lr=None, epochs=None, 
 
 def _validate(model, loss_fxn, data_loader, device, desc=None):
     """One pass over data_loader; returns (valid_loss, acc, FPR, FNR)."""
+
     valid_loss = 0
-    tp = fp = tn = fn = 0
+    all_preds = []
+    all_labels = []
+
     with torch.no_grad():
         # Validation loop
         for segs, labels in tqdm(data_loader, desc=desc, leave=False):
@@ -225,16 +228,13 @@ def _validate(model, loss_fxn, data_loader, device, desc=None):
             labels = labels.to(device)
             logits = model(segs)
             valid_loss += loss_fxn(logits.squeeze(-1), labels.float()).item()
-            preds = (torch.sigmoid(logits.squeeze(-1)) >= 0.5).long().cpu().numpy()  # 0.5 is a training diagnostic only; final eval uses θ*(λ)
-            labels = labels.cpu().numpy()
-            tp += ((preds == 1) & (labels == 1)).sum()
-            fp += ((preds == 1) & (labels == 0)).sum()
-            tn += ((preds == 0) & (labels == 0)).sum()
-            fn += ((preds == 0) & (labels == 1)).sum()
-    valid_loss = valid_loss / len(data_loader)  # mean loss over batches
-    acc = (tp + tn) / (tp + tn + fp + fn)
-    fpr = fp / (fp + tn) if (fp + tn) > 0 else 0.0
-    fnr = fn / (fn + tp) if (fn + tp) > 0 else 0.0
+            preds = (torch.sigmoid(logits.squeeze(-1)) >= 0.5).long().cpu().numpy()  # θ=0.5 is a training diagnostic only; final eval uses θ*(λ) for A1
+            all_preds.extend(preds)
+            all_labels.extend(labels.cpu().numpy())
+
+    valid_loss /= len(data_loader)
+    acc, tp, fp, tn, fn, fpr, fnr = metrics(all_preds, all_labels)
+
     return valid_loss, acc, fpr, fnr
 
 

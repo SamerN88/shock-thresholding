@@ -1,5 +1,7 @@
 import time
 
+import numpy as np
+
 
 class Stopwatch:
     def __init__(self):
@@ -40,6 +42,39 @@ def fmt_sec(seconds: float) -> str:
     secs = int(seconds % 60)
 
     return f"{hours}h{minutes}m{secs}s"
+
+
+def metrics(preds, labels):
+    """
+    Given binary predictions and labels, computes accuracy, true/false positives/negatives, FPR, and FNR.
+    """
+    preds = np.asarray(preds)
+    labels = np.asarray(labels)
+    acc = (preds == labels).mean()
+    tp = ((preds == 1) & (labels == 1)).sum()
+    fp = ((preds == 1) & (labels == 0)).sum()
+    tn = ((preds == 0) & (labels == 0)).sum()
+    fn = ((preds == 0) & (labels == 1)).sum()
+    fpr = fp / (fp + tn) if (fp + tn) > 0 else 0.0
+    fnr = fn / (fn + tp) if (fn + tp) > 0 else 0.0
+    return acc, tp, fp, tn, fn, fpr, fnr
+
+
+def MC(preds, labels, cost_ratio):
+    """
+    Computes the core performance metric MC(λ) = FPR + λ*FNR (misclassification cost w.r.t. cost ratio λ).
+    MC(λ) is the most important metric for comparing A1 and A2 as it estimates the "clinical cost".
+    """
+    *_, fpr, fnr = metrics(preds, labels)
+    return fpr + cost_ratio * fnr
+
+
+def elkan_optimal_threshold(cost_ratio):
+    """
+    Elkan's optimal threshold p* = c10 / (c10 + c01), or equivalently in our notation,
+    θ*(λ) = 1/(λ+1) where λ = c01 / c10
+    """
+    return 1 / (cost_ratio + 1)
 
 
 class Glyphs:

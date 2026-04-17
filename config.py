@@ -45,6 +45,12 @@ CALIBRATED_DIR = 'calibrated'
 CALIBRATED_MODEL_PATH = os.path.join(CALIBRATED_DIR, 'calibrated.pt')
 COST_SENSITIVE_DIR = 'cost_sensitive'
 
+# RESULTS PATHS --------------------------------------------------------------------------------------------------------
+
+RESULTS_DIR = 'results'
+A1_RESULTS_PATH = os.path.join(RESULTS_DIR, 'a1.npz')
+A2_RESULTS_PATH = os.path.join(RESULTS_DIR, 'a2.npz')
+
 # OTHER ----------------------------------------------------------------------------------------------------------------
 
 # Labels

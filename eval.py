@@ -7,6 +7,7 @@ from tqdm import tqdm
 
 from preprocess_data import load_data_splits
 from model import Ecg1LeadCNN
+from util import metrics, MC
 
 
 def evaluate(model_path, *, cost_ratio, threshold=0.5, dataset="test", device=None):
@@ -63,7 +64,8 @@ def evaluate(model_path, *, cost_ratio, threshold=0.5, dataset="test", device=No
     loss_fxn = nn.BCEWithLogitsLoss(pos_weight=torch.tensor(float(pos_weight)).to(device))
 
     loss = 0
-    tp = fp = tn = fn = 0
+    all_preds = []
+    all_labels = []
     with torch.no_grad():
         for segs, labels in tqdm(data_loader, desc='Evaluating', leave=False):
             segs, labels = segs.to(device), labels.to(device)
@@ -72,17 +74,13 @@ def evaluate(model_path, *, cost_ratio, threshold=0.5, dataset="test", device=No
             probs = torch.sigmoid(logits / temperature)
             preds = (probs >= threshold).long().cpu().numpy()
             labels = labels.cpu().numpy()
-            tp += ((preds == 1) & (labels == 1)).sum()
-            fp += ((preds == 1) & (labels == 0)).sum()
-            tn += ((preds == 0) & (labels == 0)).sum()
-            fn += ((preds == 0) & (labels == 1)).sum()
+            all_preds.extend(preds)
+            all_labels.extend(labels)
 
     # Compute performance metrics
     loss /= len(data_loader)
-    acc = (tp + tn) / (tp + tn + fp + fn)
-    fpr = fp / (fp + tn) if (fp + tn) > 0 else 0.0
-    fnr = fn / (fn + tp) if (fn + tp) > 0 else 0.0
-    mc_lam = fpr + cost_ratio * fnr  # misclassification cost w.r.t. λ; most important metric for comparing A1 and A2
+    acc, tp, fp, tn, fn, fpr, fnr = metrics(all_preds, all_labels)
+    mc_lam = MC(all_preds, all_labels, cost_ratio)
 
     print('-'*70)
     print(f'Performance metrics (dataset: "{dataset}"):')
@@ -93,6 +91,8 @@ def evaluate(model_path, *, cost_ratio, threshold=0.5, dataset="test", device=No
     print(f'    acc   = {acc:.5f}')
     print(f'    TP={tp}  FP={fp}  TN={tn}  FN={fn}')
     print('-'*70)
+
+    return all_preds, all_labels
 
 
 if __name__ == '__main__':

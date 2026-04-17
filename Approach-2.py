@@ -2,6 +2,8 @@ import os
 import shutil
 from pathlib import Path
 
+import numpy as np
+
 from train import train
 from eval import evaluate
 from util import Glyphs
@@ -10,6 +12,8 @@ from config import (
     MODEL_DIR,
     FINAL_MODEL_PATH,
     COST_SENSITIVE_DIR,
+    RESULTS_DIR,
+    A2_RESULTS_PATH,
     COST_RATIOS
 )
 
@@ -73,11 +77,24 @@ def main():
     print()
 
     # Evaluate each λ-aware model at default threshold θ=0.5
+    all_preds = {}
+    labels = None
     for cost_ratio in COST_RATIOS:
         print(f'COST RATIO:  λ = {cost_ratio}\n')
         model_path = os.path.join(COST_SENSITIVE_DIR, f'lam-{cost_ratio}', f'lam-{cost_ratio}.pt')
-        evaluate(model_path=model_path, cost_ratio=cost_ratio, threshold=0.5, dataset='test')
+        preds, labels = evaluate(
+            model_path=model_path,
+            cost_ratio=cost_ratio,
+            threshold=0.5,
+            dataset='test'
+        )
+        all_preds[cost_ratio] = preds
         print('\n' + dH*100 + '\n')
+
+    # Save predictions for statistical significance test in compare.py
+    Path(RESULTS_DIR).mkdir(parents=True, exist_ok=True)
+    np.savez(A2_RESULTS_PATH, labels=labels, **{f'preds_{lam}': preds for lam, preds in all_preds.items()})
+    print(f'Saved A2 predictions to:  {A2_RESULTS_PATH}')
 
 
 if __name__ == '__main__':
