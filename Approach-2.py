@@ -19,14 +19,14 @@ from config import (
 
 
 # Special characters, just for pretty display
-dH = Glyphs.dH
 dV = Glyphs.dV
-dDR = Glyphs.dDR
-dDL = Glyphs.dDL
-dUR = Glyphs.dUR
+dH = Glyphs.dH
 dUL = Glyphs.dUL
-dVR = Glyphs.d3R
-dVL = Glyphs.d3L
+dUR = Glyphs.dUR
+dDL = Glyphs.dDL
+dDR = Glyphs.dDR
+d3L = Glyphs.d3L
+d3R = Glyphs.d3R
 bul = Glyphs.bul
 
 
@@ -35,7 +35,7 @@ def main():
     RESET_RANDOM_STATE()
     print(dDR + dH*70 + dDL)
     print(dV + 'APPROACH 2: COST-SENSITIVE TRAINING'.center(70) + dV)
-    print(dVR + dH*70 + dVL)
+    print(d3R + dH*70 + d3L)
     print(dV + f'   {bul} Train {len(COST_RATIOS)} cost-sensitive models with'.ljust(70) + dV)
     print(dV + f'        pos_weight = λ = {", ".join(map(str, COST_RATIOS))}'.ljust(70) + dV)
     print(dV + f'   {bul} Evaluate each model at default threshold θ=0.5 (no calibration)'.ljust(70) + dV)

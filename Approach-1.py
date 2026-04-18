@@ -27,11 +27,8 @@ dUL = Glyphs.dUL
 dUR = Glyphs.dUR
 dDL = Glyphs.dDL
 dDR = Glyphs.dDR
-d3U = Glyphs.d3U
-d3D = Glyphs.d3D
 d3L = Glyphs.d3L
 d3R = Glyphs.d3R
-d4 = Glyphs.d4
 bul = Glyphs.bul
 
 
