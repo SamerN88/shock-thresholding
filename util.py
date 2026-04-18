@@ -101,6 +101,17 @@ def elkan_optimal_threshold(cost_ratio):
 
 
 class Glyphs:
+    sV = chr(0x2502)   # │  single bar, vertical
+    sH = chr(0x2500)   # ─  single bar, horizontal
+    sUL = chr(0x2518)  # ┘  single bar, up left
+    sUR = chr(0x2514)  # └  single bar, up right
+    sDL = chr(0x2510)  # ┐  single bar, down left
+    sDR = chr(0x250C)  # ┌  single bar, down right
+    s3U = chr(0x2534)  # ┴  single bar, 3-way intersection pointing up
+    s3D = chr(0x252C)  # ┬  single bar, 3-way intersection pointing down
+    s3L = chr(0x2524)  # ┤  single bar, 3-way intersection pointing left
+    s3R = chr(0x251C)  # ├  single bar, 3-way intersection pointing right
+    s4 = chr(0x253C)   # ┼  single bar, 4-way intersection
     dV = chr(0x2551)   # ║  double bar, vertical
     dH = chr(0x2550)   # ═  double bar, horizontal
     dUL = chr(0x255D)  # ╝  double bar, up left
