@@ -9,6 +9,47 @@ sH = Glyphs.sH
 dH = Glyphs.dH
 
 
+def compare(cost_ratio, a1_data, a2_data):
+    """
+    Compares the EC(λ) of A1 vs. A2 to see if their difference is statistically significant,
+    using paired bootstrap test.
+    """
+
+    labels   = a1_data['labels']
+    preds_a1 = a1_data[f'preds_{cost_ratio}']
+    preds_a2 = a2_data[f'preds_{cost_ratio}']
+
+    # Get all necessary metrics for A1 and A2, and run paired bootstrap test for EC(λ)
+    _, tp1, fp1, tn1, fn1, fpr1, fnr1 = metrics(preds_a1, labels)
+    _, tp2, fp2, tn2, fn2, fpr2, fnr2 = metrics(preds_a2, labels)
+    ec1 = EC(preds_a1, labels, cost_ratio)
+    ec2 = EC(preds_a2, labels, cost_ratio)
+    delta_obs, p_value, ci_low, ci_high  = paired_bootstrap_test(preds_a1, preds_a2, labels, cost_ratio)
+
+    winner = 'A1' if ec1 < ec2 else ('A2' if ec2 < ec1 else None)
+
+    print(f'Paired Bootstrap Test (B=10,000)')
+    print(f'λ = {cost_ratio}')
+    print(sH*38)
+    print(f'{"Metric":<12} {"A1":>12} {"A2":>12}')
+    print(sH*38)
+    print(f'{"EC(λ)":<12} {ec1:>12.5f} {ec2:>12.5f}    ({"tie" if winner is None else f"{winner} wins"})')
+    print(f'{"FPR":<12} {fpr1:>12.5f} {fpr2:>12.5f}')
+    print(f'{"FNR":<12} {fnr1:>12.5f} {fnr2:>12.5f}')
+    print(f'{"TP":<12} {tp1:>12} {tp2:>12}')
+    print(f'{"FP":<12} {fp1:>12} {fp2:>12}')
+    print(f'{"TN":<12} {tn1:>12} {tn2:>12}')
+    print(f'{"FN":<12} {fn1:>12} {fn2:>12}')
+    print()
+    print(f'ΔEC(λ) = {delta_obs:+.5f}    (ΔEC = A1 - A2)')
+    print(f'95% CI: [{ci_low:+.5f}, {ci_high:+.5f}]')
+    if p_value < 0.001:
+        print(f'p < 0.001')
+    else:
+        print(f'p = {p_value:.5f}')
+    print(sH*38)
+
+
 def paired_bootstrap_test(preds_a1, preds_a2, labels, cost_ratio, B=10000):
     """
     Paired bootstrap test on ΔEC(λ) = EC_A1(λ) - EC_A2(λ)
@@ -47,42 +88,6 @@ def paired_bootstrap_test(preds_a1, preds_a2, labels, cost_ratio, B=10000):
     ci_low, ci_high = np.percentile(delta_boot, [2.5, 97.5])  # 95% confidence interval
 
     return delta_obs, p_value, ci_low, ci_high
-
-
-def compare(cost_ratio, a1_data, a2_data):
-    labels   = a1_data['labels']
-    preds_a1 = a1_data[f'preds_{cost_ratio}']
-    preds_a2 = a2_data[f'preds_{cost_ratio}']
-
-    # Get all necessary metrics for A1 and A2, and run paired bootstrap test for EC(λ)
-    _, tp1, fp1, tn1, fn1, fpr1, fnr1 = metrics(preds_a1, labels)
-    _, tp2, fp2, tn2, fn2, fpr2, fnr2 = metrics(preds_a2, labels)
-    ec1 = EC(preds_a1, labels, cost_ratio)
-    ec2 = EC(preds_a2, labels, cost_ratio)
-    delta_obs, p_value, ci_low, ci_high  = paired_bootstrap_test(preds_a1, preds_a2, labels, cost_ratio)
-
-    winner = 'A1' if ec1 < ec2 else ('A2' if ec2 < ec1 else None)
-
-    print(f'Paired Bootstrap Test (B=10,000)')
-    print(f'λ = {cost_ratio}')
-    print(sH*38)
-    print(f'{"Metric":<12} {"A1":>12} {"A2":>12}')
-    print(sH*38)
-    print(f'{"EC(λ)":<12} {ec1:>12.5f} {ec2:>12.5f}    ({"tie" if winner is None else f"{winner} wins"})')
-    print(f'{"FPR":<12} {fpr1:>12.5f} {fpr2:>12.5f}')
-    print(f'{"FNR":<12} {fnr1:>12.5f} {fnr2:>12.5f}')
-    print(f'{"TP":<12} {tp1:>12} {tp2:>12}')
-    print(f'{"FP":<12} {fp1:>12} {fp2:>12}')
-    print(f'{"TN":<12} {tn1:>12} {tn2:>12}')
-    print(f'{"FN":<12} {fn1:>12} {fn2:>12}')
-    print()
-    print(f'ΔEC(λ) = {delta_obs:+.5f}    (ΔEC = A1 - A2)')
-    print(f'95% CI: [{ci_low:+.5f}, {ci_high:+.5f}]')
-    if p_value < 0.001:
-        print(f'p < 0.001')
-    else:
-        print(f'p = {p_value:.5f}')
-    print(sH*38)
 
 
 def main():
