@@ -9,7 +9,7 @@ sH = Glyphs.sH
 dH = Glyphs.dH
 
 
-def compare(cost_ratio, a1_data, a2_data):
+def compare_EC(cost_ratio, a1_data, a2_data):
     """
     Compares the EC(λ) of A1 vs. A2 to see if their difference is statistically significant,
     using paired bootstrap test.
@@ -24,11 +24,11 @@ def compare(cost_ratio, a1_data, a2_data):
     _, tp2, fp2, tn2, fn2, fpr2, fnr2 = metrics(preds_a2, labels)
     ec1 = EC(preds_a1, labels, cost_ratio)
     ec2 = EC(preds_a2, labels, cost_ratio)
-    delta_obs, p_value, ci_low, ci_high  = paired_bootstrap_test(preds_a1, preds_a2, labels, cost_ratio)
+    delta_obs, p_value, ci_low, ci_high  = paired_bootstrap_test(preds_a1, preds_a2, labels, cost_ratio, B=10000)
 
     winner = 'A1' if ec1 < ec2 else ('A2' if ec2 < ec1 else None)
 
-    print(f'Paired Bootstrap Test (B=10,000)')
+    print(f'A1 vs. A2: Paired Bootstrap Test (B=10,000)')
     print(f'λ = {cost_ratio}')
     print(sH*38)
     print(f'{"Metric":<12} {"A1":>12} {"A2":>12}')
@@ -90,15 +90,57 @@ def paired_bootstrap_test(preds_a1, preds_a2, labels, cost_ratio, B=10000):
     return delta_obs, p_value, ci_low, ci_high
 
 
+def compare_trivial(cost_ratio, a1_data, a2_data):
+    """
+    Compares A1 and A2 against the two trivial baselines at a given λ:
+        EC+(λ) = P(Y=0)     always predict positive (θ=0); FPR=1, FNR=0
+        EC-(λ) = λ·P(Y=1)   always predict negative (θ=1); FPR=0, FNR=1
+    """
+
+    labels = a1_data['labels']
+    preds_a1 = a1_data[f'preds_{cost_ratio}']
+    preds_a2 = a2_data[f'preds_{cost_ratio}']
+
+    n = len(labels)
+    n_pos = int(labels.sum())
+    n_neg = n - n_pos
+
+    # Trivial baseline ECs
+    ec_pos  = n_neg / n                 # always predict positive: EC+ = P(Y=0)
+    ec_neg = cost_ratio * n_pos / n     # always predict negative: EC- = λ·P(Y=1)
+
+    _, _, _, _, _, fpr1, fnr1 = metrics(preds_a1, labels)
+    _, _, _, _, _, fpr2, fnr2 = metrics(preds_a2, labels)
+    ec1 = EC(preds_a1, labels, cost_ratio)
+    ec2 = EC(preds_a2, labels, cost_ratio)
+
+    print(f'Trivial Baselines')
+    print(f'λ = {cost_ratio}')
+    print(sH*68)
+    print(f'{"Metric":<12} {"Trivial Pos":>14} {"Trivial Neg":>14} {"A1":>12} {"A2":>12}')
+    print(sH*68)
+    print(f'{"EC(λ)":<12} {ec_pos:>14.5f} {ec_neg:>14.5f} {ec1:>12.5f} {ec2:>12.5f}')
+    print(f'{"FPR":<12} {1.0:>14.5f} {0.0:>14.5f} {fpr1:>12.5f} {fpr2:>12.5f}')
+    print(f'{"FNR":<12} {0.0:>14.5f} {1.0:>14.5f} {fnr1:>12.5f} {fnr2:>12.5f}')
+    print()
+    print(f'A1 vs. Trivial Pos:  ΔEC(λ) = {ec1 - ec_pos:+.5f}  ({"beats" if ec1 < ec_pos else "does not beat"} Trivial Pos)')
+    print(f'A1 vs. Trivial Neg:  ΔEC(λ) = {ec1 - ec_neg:+.5f}  ({"beats" if ec1 < ec_neg else "does not beat"} Trivial Neg)')
+    print(f'A2 vs. Trivial Pos:  ΔEC(λ) = {ec2 - ec_pos:+.5f}  ({"beats" if ec2 < ec_pos else "does not beat"} Trivial Pos)')
+    print(f'A2 vs. Trivial Neg:  ΔEC(λ) = {ec2 - ec_neg:+.5f}  ({"beats" if ec2 < ec_neg else "does not beat"} Trivial Neg)')
+    print(sH*68)
+
+
 def main():
     a1_data = dict(np.load(A1_RESULTS_PATH))
     a2_data = dict(np.load(A2_RESULTS_PATH))
 
     for cost_ratio in COST_RATIOS:
-        print(dH*70)
-        compare(cost_ratio, a1_data, a2_data)
+        print(dH*100)
+        compare_EC(cost_ratio, a1_data, a2_data)
         print()
-    print(dH*70)
+        compare_trivial(cost_ratio, a1_data, a2_data)
+        print()
+    print(dH*100)
 
 
 if __name__ == '__main__':
