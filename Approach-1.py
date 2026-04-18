@@ -58,7 +58,7 @@ def main():
     print()
 
     # Calibrate model so we can treat model output as a posterior probability (necessary for Elkan's thresholding)
-    calibrate(model_path=FINAL_MODEL_PATH)
+    T = calibrate(model_path=FINAL_MODEL_PATH)
 
     # Delete model/ directory (final weights already moved to CALIBRATED_MODEL_PATH)
     shutil.rmtree(MODEL_DIR)
@@ -72,10 +72,9 @@ def main():
 
     # Evaluate calibrated model with each cost ratio; use Elkan's optimal threshold θ*(λ) = 1/(λ+1)
     all_preds = {}
-    labels = None
     for cost_ratio in COST_RATIOS:
         print(f'COST RATIO:  λ = {cost_ratio}\n')
-        preds, labels = evaluate(
+        logits, preds, labels = evaluate(
             model_path=CALIBRATED_MODEL_PATH,
             cost_ratio=cost_ratio,
             threshold=elkan_optimal_threshold(cost_ratio),
@@ -86,7 +85,13 @@ def main():
 
     # Save predictions for statistical significance test in compare.py
     Path(RESULTS_DIR).mkdir(parents=True, exist_ok=True)
-    np.savez(A1_RESULTS_PATH, labels=labels, **{f'preds_{lam}': preds for lam, preds in all_preds.items()})
+    np.savez(
+        A1_RESULTS_PATH,
+        labels=labels,
+        logits=logits,
+        temperature=T,
+        **{f'preds_{lam}': preds for lam, preds in all_preds.items()}
+    )
     print(f'Saved A1 predictions to:  {A1_RESULTS_PATH}')
 
 

@@ -1,6 +1,7 @@
 import argparse
 from pathlib import Path
 
+import numpy as np
 import torch
 from torch import nn
 from tqdm import tqdm
@@ -63,19 +64,25 @@ def evaluate(model_path, *, cost_ratio, threshold=0.5, dataset="test", device=No
 
     loss_fxn = nn.BCEWithLogitsLoss(pos_weight=torch.tensor(float(pos_weight)).to(device))
 
+    # Run inference
     loss = 0
+    all_logits = []
     all_preds = []
     all_labels = []
     with torch.no_grad():
         for segs, labels in tqdm(data_loader, desc='Evaluating', leave=False):
-            segs, labels = segs.to(device), labels.to(device)
+            segs = segs.to(device)
+            labels = labels.to(device)
+
             logits = model(segs).squeeze(-1)
-            loss += loss_fxn(logits, labels.float()).item()
             probs = torch.sigmoid(logits / temperature)
-            preds = (probs >= threshold).long().cpu().numpy()
-            labels = labels.cpu().numpy()
-            all_preds.extend(preds)
-            all_labels.extend(labels)
+            preds = (probs >= threshold).long()
+
+            loss += loss_fxn(logits, labels.float()).item()
+
+            all_logits.extend(logits.cpu().numpy())
+            all_preds.extend(preds.cpu().numpy())
+            all_labels.extend(labels.cpu().numpy())
 
     # Compute performance metrics
     loss /= len(data_loader)
@@ -92,7 +99,11 @@ def evaluate(model_path, *, cost_ratio, threshold=0.5, dataset="test", device=No
     print(f'    TP={tp}  FP={fp}  TN={tn}  FN={fn}')
     print('-'*70)
 
-    return all_preds, all_labels
+    return (
+        np.array(all_logits),
+        np.array(all_preds),
+        np.array(all_labels)
+    )
 
 
 if __name__ == '__main__':

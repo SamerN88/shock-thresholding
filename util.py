@@ -92,6 +92,27 @@ def EC(preds, labels, cost_ratio):
     return (fp + cost_ratio * fn) / n
 
 
+def ece(probs, labels, n_bins):
+    """
+    Expected Calibration Error: weighted average of |accuracy - confidence| per bin.
+    """
+    probs = np.asarray(probs, dtype=float)
+    labels = np.asarray(labels, dtype=float)
+    bins = np.linspace(0, 1, n_bins + 1)
+    result = 0.0
+    for i in range(n_bins):
+        if i < n_bins - 1:
+            mask = (probs >= bins[i]) & (probs < bins[i + 1])
+        else:
+            mask = (probs >= bins[i]) & (probs <= bins[i + 1])
+        if mask.sum() == 0:
+            continue
+        bin_conf = probs[mask].mean()  # bin confidence
+        bin_acc = labels[mask].mean()  # bin accuracy
+        result += (mask.sum() / len(probs)) * abs(bin_acc - bin_conf)
+    return result
+
+
 def elkan_optimal_threshold(cost_ratio):
     """
     Elkan's optimal threshold p* = c10 / (c10 + c01), or equivalently in our notation,

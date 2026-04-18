@@ -2,13 +2,13 @@ import argparse
 import json
 from pathlib import Path
 
-import numpy as np
 import torch
 import torch.nn as nn
 from torch import optim
 
 from preprocess_data import load_data_splits
 from model import Ecg1LeadCNN
+from util import ece
 from config import CALIBRATED_DIR, CALIBRATED_MODEL_PATH
 
 
@@ -50,7 +50,7 @@ def calibrate(model_path, device=None):
     # Compute NLL and ECE before calibration
     probs_before = torch.sigmoid(all_logits)
     nll_before = nll(all_logits, all_labels).item()
-    ece_before = compute_ece(probs_before, all_labels, n_bins=10)
+    ece_before = ece(probs_before, all_labels, n_bins=10)
 
     # Learn T by minimizing NLL on the validation logits (Guo et al. 2017)
     # Logits and temperature stay on CPU since this is a small 1D convex optimization
@@ -71,7 +71,7 @@ def calibrate(model_path, device=None):
     # Compute NLL and ECE after calibration
     probs_after = torch.sigmoid(all_logits / T)
     nll_after = nll(all_logits / T, all_labels).item()
-    ece_after = compute_ece(probs_after, all_labels, n_bins=10)
+    ece_after = ece(probs_after, all_labels, n_bins=10)
 
     print(f'Done.\nTemperature (T):  {T:.5f}\n')
     print('Before calibration:')
@@ -93,27 +93,7 @@ def calibrate(model_path, device=None):
     pt_path.with_suffix('.json').write_text(json.dumps(info, indent=4))
 
     print(f'\nCalibrated model saved to:  {CALIBRATED_MODEL_PATH}')
-
-
-def compute_ece(probs, labels, n_bins):
-    probs = np.asarray(probs, dtype=float)
-    labels = np.asarray(labels, dtype=float)
-
-    bins = np.linspace(0, 1, n_bins + 1)
-    ece = 0
-    for i in range(n_bins):
-        mask = (
-            (probs >= bins[i]) & (probs < bins[i + 1])
-            if i < n_bins - 1 else
-            (probs >= bins[i]) & (probs <= bins[i + 1])
-        )
-        if mask.sum() == 0:
-            continue
-        bin_conf = probs[mask].mean()  # bin confidence
-        bin_acc = labels[mask].mean()  # bin accuracy
-        ece += (mask.sum() / len(probs)) * abs(bin_acc - bin_conf)
-
-    return ece
+    return T
 
 
 if __name__ == '__main__':

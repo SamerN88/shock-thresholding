@@ -78,11 +78,10 @@ def main():
 
     # Evaluate each λ-aware model at default threshold θ=0.5
     all_preds = {}
-    labels = None
     for cost_ratio in COST_RATIOS:
         print(f'COST RATIO:  λ = {cost_ratio}\n')
         model_path = os.path.join(COST_SENSITIVE_DIR, f'lam-{cost_ratio}', f'lam-{cost_ratio}.pt')
-        preds, labels = evaluate(
+        _, preds, labels = evaluate(
             model_path=model_path,
             cost_ratio=cost_ratio,
             threshold=0.5,
@@ -93,7 +92,11 @@ def main():
 
     # Save predictions for statistical significance test in compare.py
     Path(RESULTS_DIR).mkdir(parents=True, exist_ok=True)
-    np.savez(A2_RESULTS_PATH, labels=labels, **{f'preds_{lam}': preds for lam, preds in all_preds.items()})
+    np.savez(
+        A2_RESULTS_PATH,
+        labels=labels,
+        **{f'preds_{lam}': preds for lam, preds in all_preds.items()}
+    )
     print(f'Saved A2 predictions to:  {A2_RESULTS_PATH}')
 
 
