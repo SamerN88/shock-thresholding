@@ -4,7 +4,7 @@ import numpy as np
 import matplotlib.pyplot as plt
 import matplotlib.lines as mlines
 from config import A1_RESULTS_PATH, A2_RESULTS_PATH, VIZ_DIR, COST_RATIOS
-from util import ece, EC
+from util import ece, EC, elkan_optimal_threshold
 
 
 # TODO: review this file
@@ -12,7 +12,12 @@ from util import ece, EC
 
 VIZ_DIR = Path(VIZ_DIR)
 
-plt.rcParams.update({'font.family': 'serif', 'font.serif': ['Times New Roman', 'Times'], 'font.size': 13})
+plt.rcParams.update({
+    'font.family': 'serif',
+    'font.serif': ['Times New Roman', 'Times'],
+    'font.size': 13,
+    'mathtext.fontset': 'cm',  # Computer Modern (classic LaTeX math font)
+})
 
 
 # HELPERS --------------------------------------------------------------------------------------------------------------
@@ -138,7 +143,7 @@ def plot_ec_curve():
 
     # Crossover annotation
     ax.axvline(lam_star, color='#cccccc', lw=1.0, linestyle='--', zorder=1)
-    ax.text(lam_star * 1.06, 0.02, f'λ* ≈ {lam_star:.1f}', transform=ax.get_xaxis_transform(), fontsize=11, color='#888888', va='bottom')
+    ax.text(lam_star * 1.06, 0.02, rf'$\lambda\!^* \approx$ {lam_star:.1f}', transform=ax.get_xaxis_transform(), fontsize=11, color='#888888', va='bottom')
 
     # Axes
     ax.set_xscale('log')
@@ -146,8 +151,8 @@ def plot_ec_curve():
     ax.set_xticklabels([str(int(l)) if l == int(l) else str(l) for l in lams])
     ax.set_xlim(0.85, 24)
     ax.set_ylim(0, 1.6)
-    ax.set_xlabel('Cost ratio λ', fontsize=14)
-    ax.set_ylabel('EC(λ)', fontsize=14)
+    ax.set_xlabel(r'Cost ratio $\lambda$', fontsize=14)
+    ax.set_ylabel(r'EC($\lambda$)', fontsize=14, rotation=0, labelpad=35)
     ax.set_title('Expected Cost vs. Cost Ratio (test set)', fontsize=15)
     ax.legend(fontsize=11, loc='upper left')
     ax.grid(True, color='#cccccc', linewidth=0.6, which='major', zorder=0)
@@ -160,9 +165,99 @@ def plot_ec_curve():
     print(f'Saved:  {out}')
 
 
+def plot_elkan_curve():
+    """
+    Three stacked panels showing Elkan's optimal threshold θ*(λ) = 1/(1+λ).
+    Each panel highlights a specific λ from COST_RATIOS with a vertical drop line,
+    a horizontal threshold line, and a red-shaded "predict positive" region above θ*(λ).
+    """
+
+    highlight_lams = [1, 2, 20]
+    lam_range = np.linspace(0, 25, 1000)
+    theta_curve = elkan_optimal_threshold(lam_range)
+
+    fig, axes = plt.subplots(3, 1, figsize=(11, 7), sharex=True)
+    fig.subplots_adjust(hspace=0.08)
+
+    for ax, lam_val in zip(axes, highlight_lams):
+        theta_val = elkan_optimal_threshold(lam_val)
+
+        # θ*(λ) curve
+        ax.plot(lam_range, theta_curve, color='black', lw=1.8, zorder=3)
+
+        # Red translucent shading above θ*(λ_val) — "predict positive" region
+        ax.axhspan(theta_val, 1.0, color='red', alpha=0.12, zorder=1)
+
+        # Horizontal threshold line — red dashed
+        ax.axhline(theta_val, color='red', lw=1.6, linestyle='--', zorder=2)
+
+        # Vertical drop line from (λ_val, 0) to (λ_val, θ*(λ_val))
+        ax.plot([lam_val, lam_val], [0, theta_val], color='#555555', lw=1.2, linestyle='--', zorder=2)
+
+        # Dot at (λ_val, θ*(λ_val))
+        ax.plot(lam_val, theta_val, 'o', color='black', ms=5, zorder=4)
+
+        # Y-axis ticks: 0, threshold value (red + bold), 1
+        # For λ=20 θ*≈0.048 is too close to 0 to fit as a tick label — use a text annotation instead
+        if lam_val == 20:
+            ax.set_yticks([0, theta_val, 1])
+            ax.set_yticklabels([f'{0:.1f}', '', f'{1:.1f}'], fontsize=12)
+            ax.text(-0.01, theta_val - 0.02, f'{theta_val:.3f}',
+                    transform=ax.get_yaxis_transform(), ha='right', va='bottom',
+                    fontsize=12, color='red', fontweight='bold')
+        else:
+            ax.set_yticks([0, theta_val, 1])
+            if lam_val == 1:
+                theta_label = '0.5'
+            else:
+                theta_label = f'{theta_val:.3f}'
+            tick_labels = ax.set_yticklabels([f'{0:.1f}', theta_label, f'{1:.1f}'], fontsize=12)
+            tick_labels[1].set_color('red')
+            tick_labels[1].set_fontweight('bold')
+        ax.set_ylim(0, 1)
+
+        # λ annotation: below x-axis for λ=1,2; just above curve point for λ=20 (no space below)
+        if lam_val == 20:
+            ax.text(lam_val, theta_val + 0.06, rf'$\lambda$={lam_val}', ha='center', va='bottom', fontsize=12, color='#555555')
+        else:
+            ax.text(lam_val, -0.07, rf'$\lambda$={lam_val}', ha='center', va='top', fontsize=12, color='#555555', transform=ax.get_xaxis_transform())
+
+        # Region labels on the first panel only
+        if lam_val == highlight_lams[0]:
+            label_color = '#aaaaaa'
+            ax.text(12.5, (theta_val + 1.0) / 2, 'SHOCKABLE',
+                    ha='center', va='center', fontsize=15, color=label_color,
+                    fontweight='bold', zorder=2)
+            ax.text(12.5, theta_val / 2, 'NON-SHOCKABLE',
+                    ha='center', va='center', fontsize=15, color=label_color,
+                    fontweight='bold', zorder=2)
+
+        ax.set_xlim(0, 25)
+        ax.grid(True, color='#cccccc', linewidth=0.6, zorder=0)
+        ax.set_ylabel(r'$\theta\!^*\!(\lambda)$', fontsize=13, rotation=0)
+
+    axes[-1].set_xlabel(r'Cost ratio $\lambda$', fontsize=14)
+    axes[-1].set_xticks(range(0, 26, 5))
+    fig.suptitle(r"Elkan's Optimal Threshold $\theta\!^*\!(\lambda) = \dfrac{1}{\lambda+1}$", fontsize=16)
+
+    # Pin all y-axis labels to the same x so they align regardless of
+    # varying tick label widths ("0.5" vs "0.333" vs "0.048").
+    # Value is in axes coordinates; negative = left of the axes edge.
+    for ax in axes:
+        ax.yaxis.set_label_coords(-0.07, 0.5)
+    plt.tight_layout()
+
+    out = VIZ_DIR / 'elkan_curve.pdf'
+    VIZ_DIR.mkdir(exist_ok=True)
+    fig.savefig(out, bbox_inches='tight')
+    plt.close(fig)
+    print(f'Saved:  {out}')
+
+
 def main():
     plot_reliability_diagram()
     plot_ec_curve()
+    plot_elkan_curve()
 
 
 if __name__ == '__main__':
