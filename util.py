@@ -121,6 +121,19 @@ def elkan_optimal_threshold(cost_ratio):
     return 1 / (cost_ratio + 1)
 
 
+def sigma_star(p, cost_ratio):
+    """
+    Optimal confidence output of a cost-sensitive model trained with pos_weight=λ (Approach 2).
+
+        σ*(p) = λp / (1 − p + λp)
+
+    This is the posterior P(Y=1|x) that a Bayes-optimal model trained under cost ratio λ would
+    output for a true class-1 probability of p. Setting σ*(p) = 0.5 recovers Elkan's threshold:
+    p = θ*(λ) = 1/(λ+1), establishing theoretical equivalence of A1 and A2.
+    """
+    return cost_ratio * p / (1 - p + cost_ratio * p)
+
+
 class Glyphs:
     sV = chr(0x2502)   # │  single bar, vertical
     sH = chr(0x2500)   # ─  single bar, horizontal
