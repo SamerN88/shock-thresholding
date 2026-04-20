@@ -229,16 +229,16 @@ def handle_signal_nans(signal, max_nan_gap):
     For each channel, each contiguous NaN gap is linearly interpolated or flagged
     for window-dropping. A gap is interpolated only when all three hold:
 
-      (A) It is interior — neither leading (starting at sample 0) nor trailing
+      (A) It is interior -- neither leading (starting at sample 0) nor trailing
           (ending at the last sample), so valid signal exists on both sides.
       (B) Its length is <= max_nan_gap.
       (C) The 2*gap_len samples immediately following the gap are NaN-free, or
           the signal ends before that check window is exhausted (accepted near
-          end-of-record — handles the case where fewer than 2*gap_len samples
+          end-of-record -- handles the case where fewer than 2*gap_len samples
           remain but the gap is still genuinely isolated).
 
     This guards against interpolating across clustered small gaps where tiny
-    islands of valid signal are surrounded by NaN — in that case the gap is
+    islands of valid signal are surrounded by NaN -- in that case the gap is
     small by condition B but condition C fails because the next NaN gap is
     too close, indicating the overall region is majority-NaN and meaningless
     to interpolate.
@@ -256,8 +256,8 @@ def handle_signal_nans(signal, max_nan_gap):
     large_nan_mask = np.zeros(n_samples, dtype=bool)
 
     for ch in range(signal.shape[1]):
-        col = signal[:, ch]          # view; writes to col update signal directly
-        nan_mask = np.isnan(col)     # original NaN pattern — used for gap detection and condition C
+        col = signal[:, ch]       # view; writes to col update signal directly
+        nan_mask = np.isnan(col)  # original NaN pattern; used for gap detection and condition C
         if not nan_mask.any():
             continue
 

@@ -1,3 +1,5 @@
+from types import SimpleNamespace
+
 import numpy as np
 
 from config import RANDOM_SEED, COST_RATIOS, A1_RESULTS_PATH, A2_RESULTS_PATH
@@ -9,49 +11,9 @@ sH = Glyphs.sH
 dH = Glyphs.dH
 
 
-def compare_EC(cost_ratio, a1_data, a2_data):
+def paired_bootstrap_test(preds_left, preds_right, labels, cost_ratio, B=10000):
     """
-    Compares the EC(λ) of A1 vs. A2 to see if their difference is statistically significant,
-    using paired bootstrap test.
-    """
-
-    labels   = a1_data['labels']
-    preds_a1 = a1_data[f'preds_{cost_ratio}']
-    preds_a2 = a2_data[f'preds_{cost_ratio}']
-
-    # Get all necessary metrics for A1 and A2, and run paired bootstrap test for EC(λ)
-    _, tp1, fp1, tn1, fn1, fpr1, fnr1 = metrics(preds_a1, labels)
-    _, tp2, fp2, tn2, fn2, fpr2, fnr2 = metrics(preds_a2, labels)
-    ec1 = EC(preds_a1, labels, cost_ratio)
-    ec2 = EC(preds_a2, labels, cost_ratio)
-    delta_obs, p_value, ci_low, ci_high  = paired_bootstrap_test(preds_a1, preds_a2, labels, cost_ratio, B=10000)
-
-    winner = 'A1' if ec1 < ec2 else ('A2' if ec2 < ec1 else None)
-
-    print(f'A1 vs. A2: Paired Bootstrap Test (B=10,000)')
-    print(f'λ = {cost_ratio}')
-    print(sH*38)
-    print(f'{"Metric":<12} {"A1":>12} {"A2":>12}')
-    print(sH*38)
-    print(f'{"EC(λ)":<12} {ec1:>12.5f} {ec2:>12.5f}  ({"tie" if winner is None else f"{winner} wins"})')
-    print(f'{"FPR":<12} {fpr1:>12.5f} {fpr2:>12.5f}')
-    print(f'{"FNR":<12} {fnr1:>12.5f} {fnr2:>12.5f}')
-    print(f'{"TP":<12} {tp1:>12} {tp2:>12}')
-    print(f'{"FP":<12} {fp1:>12} {fp2:>12}')
-    print(f'{"TN":<12} {tn1:>12} {tn2:>12}')
-    print(f'{"FN":<12} {fn1:>12} {fn2:>12}')
-    print(sH*38)
-    print(f'ΔEC(λ) = {delta_obs:+.5f}  (ΔEC = A1 - A2)')
-    print(f'95% CI: [{ci_low:+.5f}, {ci_high:+.5f}]')
-    if p_value < 0.001:
-        print(f'p < 0.001')
-    else:
-        print(f'p = {p_value:.5f}')
-
-
-def paired_bootstrap_test(preds_a1, preds_a2, labels, cost_ratio, B=10000):
-    """
-    Paired bootstrap test on ΔEC(λ) = EC_A1(λ) - EC_A2(λ)
+    Paired bootstrap test on ΔEC(λ) = EC_left(λ) - EC_right(λ)
 
     Both models are evaluated on the same resampled indices each iteration, preserving
     the paired structure. The bootstrap distribution is shifted by the observed ΔEC(λ)
@@ -59,7 +21,7 @@ def paired_bootstrap_test(preds_a1, preds_a2, labels, cost_ratio, B=10000):
     the two-sided p-value.
 
     Returns: (delta_obs, p_value, ci_low, ci_high)
-        delta_obs       observed ΔEC(λ); negative means A1 is better
+        delta_obs       observed ΔEC(λ); negative means left is better
         p_value         two-sided p-value under H0
         ci_low/ci_high  2.5/97.5 percentiles of the bootstrap distribution
     """
@@ -68,18 +30,18 @@ def paired_bootstrap_test(preds_a1, preds_a2, labels, cost_ratio, B=10000):
     rng = np.random.default_rng(RANDOM_SEED)
     n = len(labels)
 
-    # Get the observed EC(λ) on the whole dataset for both A1 and A2, and the ΔEC(λ)
-    ec1_obs = EC(preds_a1, labels, cost_ratio)
-    ec2_obs = EC(preds_a2, labels, cost_ratio)
-    delta_obs = ec1_obs - ec2_obs
+    # Get the observed EC(λ) on the whole dataset for both left and right
+    ec_left_obs  = EC(preds_left,  labels, cost_ratio)
+    ec_right_obs = EC(preds_right, labels, cost_ratio)
+    delta_obs = ec_left_obs - ec_right_obs  # ΔEC(λ)
 
     # Draw B bootstrap samples, each of size n=len(dataset), and collect ΔEC(λ) for each bootstrap
     delta_boot = np.empty(B)
     for b in range(B):
         idx = rng.integers(0, n, size=n)
-        ec1_b = EC(preds_a1[idx], labels[idx], cost_ratio)
-        ec2_b = EC(preds_a2[idx], labels[idx], cost_ratio)
-        delta_boot[b] = ec1_b - ec2_b
+        ec_left_boot = EC(preds_left[idx], labels[idx], cost_ratio)
+        ec_right_boot = EC(preds_right[idx], labels[idx], cost_ratio)
+        delta_boot[b] = ec_left_boot - ec_right_boot
 
     # Shift bootstrap distribution to the null hypothesis center (ΔEC = 0), then compute two-sided p-value
     abs_diffs = np.abs(delta_boot - delta_obs)
@@ -89,12 +51,19 @@ def paired_bootstrap_test(preds_a1, preds_a2, labels, cost_ratio, B=10000):
     return delta_obs, p_value, ci_low, ci_high
 
 
-def compare_trivial(cost_ratio, a1_data, a2_data):
+def compare_ec(cost_ratio, a1_data, a2_data):
     """
-    Compares A1 and A2 against the two trivial baselines at a given λ:
-        EC+(λ) = P(Y=0)     always predict positive (θ=0); FPR=1, FNR=0
-        EC-(λ) = λ·P(Y=1)   always predict negative (θ=1); FPR=0, FNR=1
+    Unified comparison for a single λ: prints one Performance Metrics table and one
+    Statistical Comparisons table covering all five comparison pairs:
+        - A1 vs. A2
+        - A1 vs. Trivial Pos
+        - A1 vs. Trivial Neg
+        - A2 vs. Trivial Pos
+        - A2 vs. Trivial Neg
     """
+
+    print(f'λ = {cost_ratio}')
+    print()
 
     labels = a1_data['labels']
     preds_a1 = a1_data[f'preds_{cost_ratio}']
@@ -104,28 +73,64 @@ def compare_trivial(cost_ratio, a1_data, a2_data):
     n_pos = int(labels.sum())
     n_neg = n - n_pos
 
-    # Trivial baseline ECs
-    ec_pos  = n_neg / n                 # always predict positive: EC+ = P(Y=0)
-    ec_neg = cost_ratio * n_pos / n     # always predict negative: EC- = λ·P(Y=1)
+    # Trivial baseline predictions (deterministic)
+    preds_tp = np.ones(n, dtype=preds_a1.dtype)   # always predict positive; EC+ = P(Y=0)
+    preds_tn = np.zeros(n, dtype=preds_a1.dtype)  # always predict negative; EC- = λ·P(Y=1)
 
+    # Metrics
+    ec_tp, fpr_tp, fnr_tp = n_neg / n, 1.0, 0.0
+    ec_tn, fpr_tn, fnr_tn = cost_ratio * n_pos / n, 0.0, 1.0
     _, _, _, _, _, fpr1, fnr1 = metrics(preds_a1, labels)
     _, _, _, _, _, fpr2, fnr2 = metrics(preds_a2, labels)
     ec1 = EC(preds_a1, labels, cost_ratio)
     ec2 = EC(preds_a2, labels, cost_ratio)
 
-    print(f'Trivial Baselines')
-    print(f'λ = {cost_ratio}')
-    print(sH*68)
-    print(f'{"Metric":<12} {"Trivial Pos":>14} {"Trivial Neg":>14} {"A1":>12} {"A2":>12}')
-    print(sH*68)
-    print(f'{"EC(λ)":<12} {ec_pos:>14.5f} {ec_neg:>14.5f} {ec1:>12.5f} {ec2:>12.5f}')
-    print(f'{"FPR":<12} {1.0:>14.5f} {0.0:>14.5f} {fpr1:>12.5f} {fpr2:>12.5f}')
-    print(f'{"FNR":<12} {0.0:>14.5f} {1.0:>14.5f} {fnr1:>12.5f} {fnr2:>12.5f}')
-    print(sH*68)
-    print(f'A1 vs. Trivial Pos:  ΔEC(λ) = {ec1 - ec_pos:+.5f}  ({"beats" if ec1 < ec_pos else "does not beat"} Trivial Pos)')
-    print(f'A1 vs. Trivial Neg:  ΔEC(λ) = {ec1 - ec_neg:+.5f}  ({"beats" if ec1 < ec_neg else "does not beat"} Trivial Neg)')
-    print(f'A2 vs. Trivial Pos:  ΔEC(λ) = {ec2 - ec_pos:+.5f}  ({"beats" if ec2 < ec_pos else "does not beat"} Trivial Pos)')
-    print(f'A2 vs. Trivial Neg:  ΔEC(λ) = {ec2 - ec_neg:+.5f}  ({"beats" if ec2 < ec_neg else "does not beat"} Trivial Neg)')
+    # Table 1: Performance Metrics -------------------------------------------------------------------------------------
+    T1 = SimpleNamespace(w1=8,  w2=15, w3=15, w4=13, w5=13)
+
+    sep1 = sH * (T1.w1 + T1.w2 + T1.w3 + T1.w4 + T1.w5)
+    print('Performance Metrics'.center(len(sep1)))
+    print(sep1)
+    print(f'{"Metric":<{T1.w1}}{"Trivial Pos":>{T1.w2}}{"Trivial Neg":>{T1.w3}}{"A1":>{T1.w4}}{"A2":>{T1.w5}}')
+    print(sep1)
+    print(f'{"EC(λ)":<{T1.w1}}{ec_tp:>{T1.w2}.5f}{ec_tn:>{T1.w3}.5f}{ec1:>{T1.w4}.5f}{ec2:>{T1.w5}.5f}')
+    print(f'{"FPR":<{T1.w1}}{fpr_tp:>{T1.w2}.5f}{fpr_tn:>{T1.w3}.5f}{fpr1:>{T1.w4}.5f}{fpr2:>{T1.w5}.5f}')
+    print(f'{"FNR":<{T1.w1}}{fnr_tp:>{T1.w2}.5f}{fnr_tn:>{T1.w3}.5f}{fnr1:>{T1.w4}.5f}{fnr2:>{T1.w5}.5f}')
+    print(sep1)
+    # ------------------------------------------------------------------------------------------------------------------
+
+    # Bootstrap tests for all five pairs
+    d12, p12, lo12, hi12 = paired_bootstrap_test(preds_a1, preds_a2, labels, cost_ratio)
+    d1p, p1p, lo1p, hi1p = paired_bootstrap_test(preds_a1, preds_tp, labels, cost_ratio)
+    d1n, p1n, lo1n, hi1n = paired_bootstrap_test(preds_a1, preds_tn, labels, cost_ratio)
+    d2p, p2p, lo2p, hi2p = paired_bootstrap_test(preds_a2, preds_tp, labels, cost_ratio)
+    d2n, p2n, lo2n, hi2n = paired_bootstrap_test(preds_a2, preds_tn, labels, cost_ratio)
+
+    # Table 2: Statistical Comparisons ---------------------------------------------------------------------------------
+    T2 = SimpleNamespace(w1=22, w2=11, w3=24, w4=9)
+
+    def fmt_p(p):
+        return '< 0.001' if p < 0.001 else f'{p:.3f}'
+
+    def fmt_row(label, delta, ci_lo, ci_hi, p):
+        ci_str = f'[{ci_lo:+.5f}, {ci_hi:+.5f}]'
+        return f'{label:<{T2.w1}}{delta:>+{T2.w2}.5f}    {ci_str:<{T2.w3}}{fmt_p(p):>{T2.w4}}'
+
+    sep2 = sH * (T2.w1 + T2.w2 + 4 + T2.w3 + T2.w4)
+    verdict = 'A1 wins' if ec1 < ec2 else ('A2 wins' if ec2 < ec1 else 'tie')
+    print()
+    print('Statistical Comparisons'.center(len(sep2)))
+    print(sep2)
+    print(f'{"Comparison":<{T2.w1}}{"ΔEC":>{T2.w2}}    {"95% CI":<{T2.w3}}{"p   ":>{T2.w4}}')
+    print(sep2)
+    print(fmt_row('A1 vs. A2', d12, lo12, hi12, p12) + f'  ({verdict})')
+    print(fmt_row('A1 vs. Trivial Pos', d1p, lo1p, hi1p, p1p))
+    print(fmt_row('A1 vs. Trivial Neg', d1n, lo1n, hi1n, p1n))
+    print(fmt_row('A2 vs. Trivial Pos', d2p, lo2p, hi2p, p2p))
+    print(fmt_row('A2 vs. Trivial Neg', d2n, lo2n, hi2n, p2n))
+    print(sep2)
+    print(f'Note:  ΔEC = left - right')
+    # ------------------------------------------------------------------------------------------------------------------
 
 
 def main():
@@ -134,9 +139,7 @@ def main():
 
     for cost_ratio in COST_RATIOS:
         print(dH*100)
-        compare_EC(cost_ratio, a1_data, a2_data)
-        print()
-        compare_trivial(cost_ratio, a1_data, a2_data)
+        compare_ec(cost_ratio, a1_data, a2_data)
         print()
     print(dH*100)
 

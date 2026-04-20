@@ -125,7 +125,7 @@ def optimal_cs_conf(p, cost_ratio):
     """
     Optimal confidence output of a cost-sensitive model trained with pos_weight=λ (Approach 2).
 
-        σ*(p) = λp / (1 − p + λp)
+        σ*(p) = λp / (1 - p + λp)
 
     This is the posterior P(Y=1|x) that a Bayes-optimal model trained under cost ratio λ would
     output for a true class-1 probability of p. Setting σ*(p) = 0.5 recovers Elkan's threshold:
