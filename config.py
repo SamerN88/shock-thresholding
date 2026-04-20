@@ -57,4 +57,4 @@ VIZ_DIR = 'viz'
 # Labels
 SHOCKABLE = 1
 NON_SHOCKABLE = 0
-COST_RATIOS = [1.0, 2.0, 5.0, 10.0, 20.0]
+COST_RATIOS = [1.0, 2.0, 5.0, 10.0, 20.0, 50.0, 100.0]  # λ is clinically grounded up to ~20; we include 50 and 100 to probe behavior at extreme cost ratios
