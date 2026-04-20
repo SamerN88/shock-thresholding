@@ -36,7 +36,7 @@ def venv_python():
 
 def main():
     # Python version check
-    if sys.version_info < (5,1):
+    if sys.version_info < MIN_PYTHON:
         sys.exit(f'{RED}Python {".".join(map(str, MIN_PYTHON))}+ required, got {sys.version}{RESET}')
 
     # 1) Create venv
