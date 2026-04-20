@@ -11,7 +11,7 @@ python setup.py
 
 This creates a virtual environment, installs all dependencies, and registers a Jupyter kernel.
 
-To run the end-to-end pipeline notebook, open `pipeline.ipynb` and select the `shock-thresholding` kernel. This notebook can be used to reproduce the results in the paper.
+To run the end-to-end pipeline, open `pipeline.ipynb` and select the `shock-thresholding` kernel. This notebook reproduces the results in the paper.
 
 ---
 
