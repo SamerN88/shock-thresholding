@@ -17,7 +17,7 @@ To run the end-to-end pipeline notebook, open `pipeline.ipynb` and select the `s
 
 ## Datasets
 
-These datasets are automatically downloaded in the pipeline notebook `pipeline.ipynb`. If you'd like to download them manually:
+These datasets are automatically downloaded in the pipeline notebook `pipeline.ipynb`. You can also download them manually:
 
 **MIT-BIH Malignant Ventricular Ectopy Database** (~47.5 MB):
 ```commandline
