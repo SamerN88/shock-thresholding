@@ -121,7 +121,7 @@ def elkan_optimal_threshold(cost_ratio):
     return 1 / (cost_ratio + 1)
 
 
-def sigma_star(p, cost_ratio):
+def optimal_cs_conf(p, cost_ratio):
     """
     Optimal confidence output of a cost-sensitive model trained with pos_weight=λ (Approach 2).
 

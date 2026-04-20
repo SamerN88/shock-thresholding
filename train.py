@@ -27,7 +27,7 @@ from config import (
 )
 
 
-def train(pos_weight=None, resume=False, batch_size=None, lr=None, epochs=None, device=None):
+def train(pos_weight=None, resume=False, batch_size=None, lr=None, epochs=None, device=None, yes=False):
     RESET_RANDOM_STATE()
 
     if device is None:
@@ -91,7 +91,7 @@ def train(pos_weight=None, resume=False, batch_size=None, lr=None, epochs=None, 
             scheduler = _make_lr_scheduler(optimizer)
             print(f'LR overridden to {explicit_lr}; LR scheduler reset.')
     else:
-        if not _setup_fresh_run():
+        if not _setup_fresh_run(yes=yes):
             return False
         start_epoch = 1
 
@@ -250,18 +250,19 @@ def _find_best_checkpoint():
     return best_valid_loss, best_epoch
 
 
-def _setup_fresh_run():
+def _setup_fresh_run(yes=False):
     model_dir = Path(MODEL_DIR)
     if model_dir.exists() and any(p.is_file() for p in model_dir.rglob('*')):
-        try:
-            confirm = input(f'WARNING: {MODEL_DIR + os.path.sep} is non-empty. THIS WILL DELETE ALL EXISTING CHECKPOINTS AND MODELS.\nType "yes" to confirm: ')
-        except KeyboardInterrupt:
-            print('\n\nAborted.')
-            return False
-        if confirm.strip().lower() != 'yes':
-            print('\nAborted.')
-            return False
-        print()
+        if not yes:
+            try:
+                confirm = input(f'WARNING: {MODEL_DIR + os.path.sep} is non-empty. THIS WILL DELETE ALL EXISTING CHECKPOINTS AND MODELS.\nType "yes" to confirm: ')
+            except KeyboardInterrupt:
+                print('\n\nAborted.')
+                return False
+            if confirm.strip().lower() != 'yes':
+                print('\nAborted.')
+                return False
+            print()
         shutil.rmtree(model_dir)
     Path(CHECKPOINTS_DIR).mkdir(parents=True, exist_ok=True)
     return True
@@ -318,14 +319,15 @@ def _save_final_model(model, info):
 if __name__ == '__main__':
     parser = argparse.ArgumentParser(description='Train ECG shock classification model')
     parser.add_argument('--resume',     action='store_true',    default=False,  help='Resume from latest checkpoint (default: False)')
+    parser.add_argument('--yes',        action='store_true',    default=False,  help='Skip confirmation prompt when overwriting existing model directory')
     parser.add_argument('--batch_size', type=int,               default=None,   help=f'Batch size (default: {BATCH_SIZE}, or previous run value when resuming)')
     parser.add_argument('--lr',         type=float,             default=None,   help=f'Initial learning rate (default: {INIT_LEARNING_RATE}, or previous run value when resuming)')
     parser.add_argument('--epochs',     type=int,               default=None,   help=f'Total training epochs (default: {EPOCHS}, or previous run value when resuming)')
-    parser.add_argument('--device',     type=str,               default=None,   help='Device to train on, e.g. "cuda", "mps", "cpu" (default: auto-detect)')
     parser.add_argument('--pos_weight', type=float,             default=None,   help='pos_weight for BCEWithLogitsLoss (default: 1.0, or previous run value when resuming; cannot change mid-training)')
+    parser.add_argument('--device',     type=str,               default=None,   help='Device to train on, e.g. "cuda", "mps", "cpu" (default: auto-detect)')
     args = parser.parse_args()
 
     try:
-        train(pos_weight=args.pos_weight, resume=args.resume, batch_size=args.batch_size, lr=args.lr, epochs=args.epochs, device=args.device)
+        train(resume=args.resume, yes=args.yes, batch_size=args.batch_size, lr=args.lr, epochs=args.epochs, pos_weight=args.pos_weight, device=args.device)
     except KeyboardInterrupt:
         print('\nTraining interrupted. Resume with --resume flag.')

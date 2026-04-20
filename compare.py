@@ -33,21 +33,20 @@ def compare_EC(cost_ratio, a1_data, a2_data):
     print(sH*38)
     print(f'{"Metric":<12} {"A1":>12} {"A2":>12}')
     print(sH*38)
-    print(f'{"EC(λ)":<12} {ec1:>12.5f} {ec2:>12.5f}    ({"tie" if winner is None else f"{winner} wins"})')
+    print(f'{"EC(λ)":<12} {ec1:>12.5f} {ec2:>12.5f}  ({"tie" if winner is None else f"{winner} wins"})')
     print(f'{"FPR":<12} {fpr1:>12.5f} {fpr2:>12.5f}')
     print(f'{"FNR":<12} {fnr1:>12.5f} {fnr2:>12.5f}')
     print(f'{"TP":<12} {tp1:>12} {tp2:>12}')
     print(f'{"FP":<12} {fp1:>12} {fp2:>12}')
     print(f'{"TN":<12} {tn1:>12} {tn2:>12}')
     print(f'{"FN":<12} {fn1:>12} {fn2:>12}')
-    print()
-    print(f'ΔEC(λ) = {delta_obs:+.5f}    (ΔEC = A1 - A2)')
+    print(sH*38)
+    print(f'ΔEC(λ) = {delta_obs:+.5f}  (ΔEC = A1 - A2)')
     print(f'95% CI: [{ci_low:+.5f}, {ci_high:+.5f}]')
     if p_value < 0.001:
         print(f'p < 0.001')
     else:
         print(f'p = {p_value:.5f}')
-    print(sH*38)
 
 
 def paired_bootstrap_test(preds_a1, preds_a2, labels, cost_ratio, B=10000):
@@ -122,12 +121,11 @@ def compare_trivial(cost_ratio, a1_data, a2_data):
     print(f'{"EC(λ)":<12} {ec_pos:>14.5f} {ec_neg:>14.5f} {ec1:>12.5f} {ec2:>12.5f}')
     print(f'{"FPR":<12} {1.0:>14.5f} {0.0:>14.5f} {fpr1:>12.5f} {fpr2:>12.5f}')
     print(f'{"FNR":<12} {0.0:>14.5f} {1.0:>14.5f} {fnr1:>12.5f} {fnr2:>12.5f}')
-    print()
+    print(sH*68)
     print(f'A1 vs. Trivial Pos:  ΔEC(λ) = {ec1 - ec_pos:+.5f}  ({"beats" if ec1 < ec_pos else "does not beat"} Trivial Pos)')
     print(f'A1 vs. Trivial Neg:  ΔEC(λ) = {ec1 - ec_neg:+.5f}  ({"beats" if ec1 < ec_neg else "does not beat"} Trivial Neg)')
     print(f'A2 vs. Trivial Pos:  ΔEC(λ) = {ec2 - ec_pos:+.5f}  ({"beats" if ec2 < ec_pos else "does not beat"} Trivial Pos)')
     print(f'A2 vs. Trivial Neg:  ΔEC(λ) = {ec2 - ec_neg:+.5f}  ({"beats" if ec2 < ec_neg else "does not beat"} Trivial Neg)')
-    print(sH*68)
 
 
 def main():

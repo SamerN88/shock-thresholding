@@ -1,5 +1,6 @@
 import os
 import shutil
+import argparse
 from pathlib import Path
 
 import numpy as np
@@ -33,7 +34,7 @@ bul = Glyphs.bul
 
 
 # Convenient orchestration script to run the entire pipeline for Approach 1 (cost-sensitive thresholding)
-def main():
+def main(yes=False):
     RESET_RANDOM_STATE()
 
     print(dDR + dH*70 + dDL)
@@ -49,7 +50,7 @@ def main():
     print('\n\n')
 
     # Train model with symmetric costs (pos_weight=1); actual cost ratio will be encoded in the thresholding later
-    ok = train(pos_weight=1)
+    ok = train(pos_weight=1, yes=yes)
     if not ok:
         print()
         print(dH*70)
@@ -96,4 +97,7 @@ def main():
 
 
 if __name__ == '__main__':
-    main()
+    parser = argparse.ArgumentParser()
+    parser.add_argument('--yes', action='store_true', default=False, help='Skip confirmation prompt when overwriting existing model directory')
+    args = parser.parse_args()
+    main(yes=args.yes)

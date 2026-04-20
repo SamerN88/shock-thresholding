@@ -536,6 +536,8 @@ def load_data_splits(*, path=SPLITS_NPZ_PATH, batch_size=BATCH_SIZE, rng=None):
 
 
 def main():
+    print('Preprocessing data...\n')
+
     # Preprocess data to get labeled/segmented/normalized examples from VFDB and CUDB
     vfdb_examples = vfdb__get_examples_by_record(window_sec=WINDOW_SEC, normalize=NORMALIZE)
     cudb_examples = cudb__get_examples_by_record(window_sec=WINDOW_SEC, normalize=NORMALIZE)

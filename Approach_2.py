@@ -1,5 +1,6 @@
 import os
 import shutil
+import argparse
 from pathlib import Path
 
 import numpy as np
@@ -31,7 +32,7 @@ bul = Glyphs.bul
 
 
 # Convenient orchestration script to run the entire pipeline for Approach 2 (cost-sensitive training)
-def main():
+def main(yes=False):
     RESET_RANDOM_STATE()
     print(dDR + dH*70 + dDL)
     print(dV + 'APPROACH 2: COST-SENSITIVE TRAINING'.center(70) + dV)
@@ -49,7 +50,7 @@ def main():
 
     # Train one model per λ; cost is encoded in training, via cost-weighted BCE loss (pos_weight=λ)
     for cost_ratio in COST_RATIOS:
-        ok = train(pos_weight=cost_ratio)
+        ok = train(pos_weight=cost_ratio, yes=yes)
         if not ok:
             print()
             print(dH*70)
@@ -101,4 +102,7 @@ def main():
 
 
 if __name__ == '__main__':
-    main()
+    parser = argparse.ArgumentParser()
+    parser.add_argument('--yes', action='store_true', default=False, help='Skip confirmation prompt when overwriting existing model directory')
+    args = parser.parse_args()
+    main(yes=args.yes)

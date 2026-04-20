@@ -4,7 +4,7 @@ import numpy as np
 import matplotlib.pyplot as plt
 import matplotlib.lines as mlines
 from config import A1_RESULTS_PATH, A2_RESULTS_PATH, VIZ_DIR, COST_RATIOS
-from util import ece, EC, elkan_optimal_threshold, sigma_star
+from util import ece, EC, elkan_optimal_threshold, optimal_cs_conf
 
 
 VIZ_DIR = Path(VIZ_DIR)
@@ -109,8 +109,8 @@ def plot_reliability_diagram():
     out = VIZ_DIR / 'reliability_diagram.pdf'
     VIZ_DIR.mkdir(exist_ok=True)
     fig.savefig(out, bbox_inches='tight')
-    plt.close(fig)
     print(f'Saved:  {out}')
+    return fig
 
 
 def plot_ec_curves():
@@ -160,8 +160,8 @@ def plot_ec_curves():
     out = VIZ_DIR / 'ec_curves.pdf'
     VIZ_DIR.mkdir(exist_ok=True)
     fig.savefig(out, bbox_inches='tight')
-    plt.close(fig)
     print(f'Saved:  {out}')
+    return fig
 
 
 def plot_elkan_curve():
@@ -239,11 +239,11 @@ def plot_elkan_curve():
     out = VIZ_DIR / 'elkan_curve.pdf'
     VIZ_DIR.mkdir(exist_ok=True)
     fig.savefig(out, bbox_inches='tight')
-    plt.close(fig)
     print(f'Saved:  {out}')
+    return fig
 
 
-def plot_sigma_star_curve():
+def plot_cs_conf_curve():
     highlight_lams = [1, 2, 20]
     p_range = np.linspace(0, 1, 1000)
 
@@ -254,7 +254,7 @@ def plot_sigma_star_curve():
     # Plot one panel per highlight λ; draw the σ*(p) curve and annotate the decision boundary at p=θ*(λ)
     for i, (ax, lam) in enumerate(zip(axes, highlight_lams)):
         theta = elkan_optimal_threshold(lam)
-        sigma_curve = sigma_star(p_range, lam)
+        sigma_curve = optimal_cs_conf(p_range, lam)
 
         # σ*(p) curve
         ax.plot(p_range, sigma_curve, color='blue', lw=1.8, zorder=3)
@@ -313,18 +313,18 @@ def plot_sigma_star_curve():
     )
 
     plt.tight_layout()
-    out = VIZ_DIR / 'sigma_star_curve.pdf'
+    out = VIZ_DIR / 'cs_conf_curve.pdf'
     VIZ_DIR.mkdir(exist_ok=True)
     fig.savefig(out, bbox_inches='tight')
-    plt.close(fig)
     print(f'Saved:  {out}')
+    return fig
 
 
 def main():
-    plot_reliability_diagram()
-    plot_ec_curves()
-    plot_elkan_curve()
-    plot_sigma_star_curve()
+    plt.close(plot_reliability_diagram())
+    plt.close(plot_ec_curves())
+    plt.close(plot_elkan_curve())
+    plt.close(plot_cs_conf_curve())
 
 
 if __name__ == '__main__':
